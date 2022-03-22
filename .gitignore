@@ -1,0 +1,6 @@
+/target
+Cargo.lock
+.idea
+
+# protobuf generated
+waku-protocol/src/protos/*.rs
