@@ -14,16 +14,14 @@ As a first iteration, `waku-rs` aims to cover the following specs, which are lis
 - [11/WAKU2-RELAY](https://rfc.vac.dev/spec/11) - for basic operation
 - [14/WAKU2-MESSAGE](https://rfc.vac.dev/spec/14) - version 0 (unencrypted)
 - [13/WAKU2-STORE](https://rfc.vac.dev/spec/13) - for historical messaging (query mode only)
+- [19/WAKU2-LIGHTPUSH](https://rfc.vac.dev/spec/19) - for pushing messages
 
 ## Protocol IDs
 
 Currently, `waku-rs` cares about the current `libp2p` protocol identifiers proposed by Waku:
 - `/vac/waku/relay/2.0.0`
 - `/vac/waku/store/2.0.0-beta4`
-
-There are also non-`libp2p` protocols that specify, using `protobuf` encoding:
-- [14/WAKU2-MESSAGE](https://rfc.vac.dev/spec/14) and [26/WAKU2-PAYLOAD](https://rfc.vac.dev/spec/26) for message payloads.
-- [13/WAKU2-STORE](https://rfc.vac.dev/spec/13) for message storage.
+- `/vac/waku/lightpush/2.0.0-beta1`
 
 Messages are exchanged over a [bi-directional binary stream](https://docs.libp2p.io/concepts/protocols/). Therefore, `libp2p` protocols prefix binary message payloads with the length of the message in bytes. The length integer is encoded as a [protobuf varint](https://developers.google.com/protocol-buffers/docs/encoding#varints).
 
