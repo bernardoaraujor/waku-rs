@@ -1,10 +1,99 @@
 use crate::pb::waku_message_pb::WakuMessage;
-use crate::pb::waku_store_pb::Index;
-
+use crate::pb::waku_store_pb::{HistoryQuery, HistoryResponse, Index};
+use async_trait::async_trait;
+use futures::prelude::*;
+use libp2p::core::upgrade::ProtocolName;
+use libp2p::request_response::{RequestResponse, RequestResponseCodec, RequestResponseEvent};
+use libp2p::NetworkBehaviour;
 use sha2::{Digest, Sha256};
+use std::io;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+const STORE_PROTOCOL_ID: &str = "/vac/waku/store/2.0.0-beta4";
 const DEFAULT_PUBSUB_TOPIC: &str = "/waku/2/default-waku/proto";
+
+#[derive(Clone)]
+pub struct WakuStoreProtocol();
+#[derive(Clone)]
+pub struct WakuStoreCodec();
+
+impl ProtocolName for WakuStoreProtocol {
+    fn protocol_name(&self) -> &[u8] {
+        STORE_PROTOCOL_ID.as_bytes()
+    }
+}
+
+#[async_trait]
+impl RequestResponseCodec for WakuStoreCodec {
+    type Protocol = WakuStoreProtocol;
+    type Request = HistoryQuery;
+    type Response = HistoryResponse;
+
+    async fn read_request<T>(&mut self, _: &Self::Protocol, io: &mut T) -> io::Result<Self::Request>
+    where
+        T: AsyncRead + Unpin + Send,
+    {
+        // todo
+        let hq = HistoryQuery::new();
+        Ok(hq)
+    }
+
+    async fn read_response<T>(
+        &mut self,
+        _: &Self::Protocol,
+        io: &mut T,
+    ) -> io::Result<Self::Response>
+    where
+        T: AsyncRead + Unpin + Send,
+    {
+        // todo
+        let hr = HistoryResponse::new();
+        Ok(hr)
+    }
+
+    async fn write_request<T>(
+        &mut self,
+        _: &Self::Protocol,
+        io: &mut T,
+        _: Self::Request,
+    ) -> io::Result<()>
+    where
+        T: AsyncWrite + Unpin + Send,
+    {
+        // todo
+        Ok(())
+    }
+
+    async fn write_response<T>(
+        &mut self,
+        _: &Self::Protocol,
+        io: &mut T,
+        res: Self::Response,
+    ) -> io::Result<()>
+    where
+        T: AsyncWrite + Unpin + Send,
+    {
+        // todo
+        Ok(())
+    }
+}
+
+#[derive(NetworkBehaviour)]
+#[behaviour(out_event = "WakuStoreEvent")]
+struct WakuStore {
+    request_response: RequestResponse<WakuStoreCodec>,
+}
+
+#[derive(Debug)]
+pub enum WakuStoreEvent {
+    RequestResponse(RequestResponseEvent<HistoryQuery, HistoryResponse>),
+}
+
+impl From<RequestResponseEvent<HistoryQuery, HistoryResponse>> for WakuStoreEvent {
+    fn from(event: RequestResponseEvent<HistoryQuery, HistoryResponse>) -> Self {
+        WakuStoreEvent::RequestResponse(event)
+    }
+}
 
 // Takes a WakuMessage and returns its Index.
 fn compute_index(msg: WakuMessage) -> Index {
