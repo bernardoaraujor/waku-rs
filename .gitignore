@@ -3,4 +3,4 @@ Cargo.lock
 .idea
 
 # protobuf generated
-waku-protocol/src/protos/*.rs
+waku-protocol/src/pb/*_pb.rs
