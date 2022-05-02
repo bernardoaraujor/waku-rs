@@ -1,5 +1,6 @@
 use crate::pb::waku_message_pb::WakuMessage;
 use crate::pb::waku_store_pb::{HistoryQuery, HistoryRPC, HistoryResponse, Index};
+use crate::waku_message::MAX_MESSAGE_SIZE;
 use async_trait::async_trait;
 use futures::prelude::*;
 use libp2p::core::upgrade::{read_length_prefixed, write_length_prefixed, ProtocolName};
@@ -10,7 +11,8 @@ use sha2::{Digest, Sha256};
 use std::io;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-const MAX_BUF_SIZE: usize = 1024 * 1024; // is this enough?
+const MAX_PAGE_SIZE: usize = 100; // Maximum number of waku messages in each page
+const MAX_STORE_RPC_SIZE: usize = MAX_PAGE_SIZE * MAX_MESSAGE_SIZE + 64 * 1024; // We add a 64kB safety buffer for protocol overhead
 const STORE_PROTOCOL_ID: &str = "/vac/waku/store/2.0.0-beta4";
 const DEFAULT_PUBSUB_TOPIC: &str = "/waku/2/default-waku/proto";
 
@@ -35,7 +37,7 @@ impl RequestResponseCodec for WakuStoreCodec {
     where
         T: AsyncRead + Unpin + Send,
     {
-        let rpc_bytes = read_length_prefixed(io, MAX_BUF_SIZE).await?;
+        let rpc_bytes = read_length_prefixed(io, MAX_STORE_RPC_SIZE).await?;
         let rpc: HistoryRPC = protobuf::Message::parse_from_bytes(&rpc_bytes).unwrap();
         Ok(rpc)
     }
@@ -48,7 +50,7 @@ impl RequestResponseCodec for WakuStoreCodec {
     where
         T: AsyncRead + Unpin + Send,
     {
-        let rpc_bytes = read_length_prefixed(io, MAX_BUF_SIZE).await?;
+        let rpc_bytes = read_length_prefixed(io, MAX_STORE_RPC_SIZE).await?;
         let rpc: HistoryRPC = protobuf::Message::parse_from_bytes(&rpc_bytes).unwrap();
         Ok(rpc)
     }
