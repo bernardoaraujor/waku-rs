@@ -2,9 +2,7 @@ use crate::pb::waku_message_pb::WakuMessage;
 use crate::pb::waku_store_pb::{HistoryQuery, HistoryRPC, HistoryResponse, Index};
 use async_trait::async_trait;
 use futures::prelude::*;
-use libp2p::core::upgrade::{
-    read_length_prefixed, read_varint, write_length_prefixed, write_varint, ProtocolName,
-};
+use libp2p::core::upgrade::{read_length_prefixed, write_length_prefixed, ProtocolName};
 use libp2p::request_response::{RequestResponse, RequestResponseCodec, RequestResponseEvent};
 use libp2p::NetworkBehaviour;
 use protobuf::Message;
