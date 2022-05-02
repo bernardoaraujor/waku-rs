@@ -2,13 +2,17 @@ use crate::pb::waku_message_pb::WakuMessage;
 use crate::pb::waku_store_pb::{HistoryQuery, HistoryResponse, Index};
 use async_trait::async_trait;
 use futures::prelude::*;
-use libp2p::core::upgrade::ProtocolName;
+use libp2p::core::upgrade::{
+    read_length_prefixed, read_varint, write_length_prefixed, write_varint, ProtocolName,
+};
 use libp2p::request_response::{RequestResponse, RequestResponseCodec, RequestResponseEvent};
 use libp2p::NetworkBehaviour;
+use protobuf::Message;
 use sha2::{Digest, Sha256};
 use std::io;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+const MAX_BUF_SIZE: usize = 1024 * 1024; // is this enough?
 const STORE_PROTOCOL_ID: &str = "/vac/waku/store/2.0.0-beta4";
 const DEFAULT_PUBSUB_TOPIC: &str = "/waku/2/default-waku/proto";
 
@@ -33,8 +37,8 @@ impl RequestResponseCodec for WakuStoreCodec {
     where
         T: AsyncRead + Unpin + Send,
     {
-        // todo
-        let hq = HistoryQuery::new();
+        let query_bytes = read_length_prefixed(io, MAX_BUF_SIZE).await?;
+        let hq: HistoryQuery = protobuf::Message::parse_from_bytes(&query_bytes).unwrap();
         Ok(hq)
     }
 
@@ -46,8 +50,8 @@ impl RequestResponseCodec for WakuStoreCodec {
     where
         T: AsyncRead + Unpin + Send,
     {
-        // todo
-        let hr = HistoryResponse::new();
+        let res_bytes = read_length_prefixed(io, MAX_BUF_SIZE).await?;
+        let hr: HistoryResponse = protobuf::Message::parse_from_bytes(&res_bytes).unwrap();
         Ok(hr)
     }
 
@@ -55,12 +59,13 @@ impl RequestResponseCodec for WakuStoreCodec {
         &mut self,
         _: &Self::Protocol,
         io: &mut T,
-        _: Self::Request,
+        query: Self::Request,
     ) -> io::Result<()>
     where
         T: AsyncWrite + Unpin + Send,
     {
-        // todo
+        let query_bytes = query.write_to_bytes()?;
+        write_length_prefixed(io, query_bytes).await?;
         Ok(())
     }
 
@@ -73,7 +78,8 @@ impl RequestResponseCodec for WakuStoreCodec {
     where
         T: AsyncWrite + Unpin + Send,
     {
-        // todo
+        let res_bytes = res.write_to_bytes()?;
+        write_length_prefixed(io, res_bytes).await?;
         Ok(())
     }
 }
