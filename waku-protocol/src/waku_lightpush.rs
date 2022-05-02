@@ -54,13 +54,13 @@ impl RequestResponseCodec for WakuLightPushCodec {
         &mut self,
         _: &Self::Protocol,
         io: &mut T,
-        query: Self::Request,
+        req: Self::Request,
     ) -> io::Result<()>
     where
         T: AsyncWrite + Unpin + Send,
     {
-        let query_bytes = query.write_to_bytes()?;
-        write_length_prefixed(io, query_bytes).await?;
+        let req_bytes = req.write_to_bytes()?;
+        write_length_prefixed(io, req_bytes).await?;
         Ok(())
     }
 
