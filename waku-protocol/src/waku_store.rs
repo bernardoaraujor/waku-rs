@@ -1,5 +1,5 @@
 use crate::pb::waku_message_pb::WakuMessage;
-use crate::pb::waku_store_pb::{HistoryQuery, HistoryResponse, Index};
+use crate::pb::waku_store_pb::{HistoryQuery, HistoryRPC, HistoryResponse, Index};
 use async_trait::async_trait;
 use futures::prelude::*;
 use libp2p::core::upgrade::{
@@ -30,16 +30,16 @@ impl ProtocolName for WakuStoreProtocol {
 #[async_trait]
 impl RequestResponseCodec for WakuStoreCodec {
     type Protocol = WakuStoreProtocol;
-    type Request = HistoryQuery;
-    type Response = HistoryResponse;
+    type Request = HistoryRPC;
+    type Response = HistoryRPC;
 
     async fn read_request<T>(&mut self, _: &Self::Protocol, io: &mut T) -> io::Result<Self::Request>
     where
         T: AsyncRead + Unpin + Send,
     {
-        let query_bytes = read_length_prefixed(io, MAX_BUF_SIZE).await?;
-        let hq: HistoryQuery = protobuf::Message::parse_from_bytes(&query_bytes).unwrap();
-        Ok(hq)
+        let rpc_bytes = read_length_prefixed(io, MAX_BUF_SIZE).await?;
+        let rpc: HistoryRPC = protobuf::Message::parse_from_bytes(&rpc_bytes).unwrap();
+        Ok(rpc)
     }
 
     async fn read_response<T>(
@@ -50,9 +50,9 @@ impl RequestResponseCodec for WakuStoreCodec {
     where
         T: AsyncRead + Unpin + Send,
     {
-        let res_bytes = read_length_prefixed(io, MAX_BUF_SIZE).await?;
-        let hr: HistoryResponse = protobuf::Message::parse_from_bytes(&res_bytes).unwrap();
-        Ok(hr)
+        let rpc_bytes = read_length_prefixed(io, MAX_BUF_SIZE).await?;
+        let rpc: HistoryRPC = protobuf::Message::parse_from_bytes(&rpc_bytes).unwrap();
+        Ok(rpc)
     }
 
     async fn write_request<T>(
@@ -92,11 +92,11 @@ struct WakuStore {
 
 #[derive(Debug)]
 pub enum WakuStoreEvent {
-    RequestResponse(RequestResponseEvent<HistoryQuery, HistoryResponse>),
+    RequestResponse(RequestResponseEvent<HistoryRPC, HistoryRPC>),
 }
 
-impl From<RequestResponseEvent<HistoryQuery, HistoryResponse>> for WakuStoreEvent {
-    fn from(event: RequestResponseEvent<HistoryQuery, HistoryResponse>) -> Self {
+impl From<RequestResponseEvent<HistoryRPC, HistoryRPC>> for WakuStoreEvent {
+    fn from(event: RequestResponseEvent<HistoryRPC, HistoryRPC>) -> Self {
         WakuStoreEvent::RequestResponse(event)
     }
 }
