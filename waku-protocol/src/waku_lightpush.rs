@@ -59,7 +59,7 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<PushRPC, PushRPC>>
 }
 
 impl WakuLightPushBehaviour {
-    pub fn new(key: identity::Keypair) -> Self {
+    fn new(key: identity::Keypair) -> Self {
         Self {
             relay: WakuRelayBehaviour::new(key),
             req_res: RequestResponse::new(
@@ -68,6 +68,17 @@ impl WakuLightPushBehaviour {
                 RequestResponseConfig::default(),
             ),
         }
+    }
+
+    fn new_request_rpc(request_id: String, pubsub_topic: String, msg: WakuMessage) -> PushRPC {
+        let mut req = PushRequest::new();
+        req.set_pubsub_topic(pubsub_topic);
+        req.set_message(msg);
+
+        let mut req_rpc = PushRPC::new();
+        req_rpc.set_request_id(request_id);
+        req_rpc.set_query(req);
+        req_rpc
     }
 }
 
@@ -143,24 +154,11 @@ impl RequestResponseCodec for WakuLightPushCodec {
     }
 }
 
-// utils
-
-pub fn new_request_rpc(request_id: String, pubsub_topic: String, msg: WakuMessage) -> PushRPC {
-    let mut req = PushRequest::new();
-    req.set_pubsub_topic(pubsub_topic);
-    req.set_message(msg);
-
-    let mut req_rpc = PushRPC::new();
-    req_rpc.set_request_id(request_id);
-    req_rpc.set_query(req);
-    req_rpc
-}
-
 #[cfg(test)]
 mod tests {
     use crate::pb::waku_lightpush_pb::{PushRPC, PushRequest};
     use crate::pb::waku_message_pb::WakuMessage;
-    use crate::waku_lightpush::{new_request_rpc, WakuLightPushBehaviour};
+    use crate::waku_lightpush::WakuLightPushBehaviour;
     use crate::waku_lightpush::{
         // WakuLightPushBehaviour,
         WakuLightPushCodec,
@@ -211,7 +209,11 @@ mod tests {
             }
 
             let msg = WakuMessage::new();
-            let rpc = new_request_rpc("test_request_id".to_string(), "test_topic".to_string(), msg);
+            let rpc = WakuLightPushBehaviour::new_request_rpc(
+                "test_request_id".to_string(),
+                "test_topic".to_string(),
+                msg,
+            );
 
             swarm
                 .behaviour_mut()
