@@ -173,54 +173,36 @@ mod tests {
         RequestResponseMessage,
     };
     use libp2p::swarm::{Swarm, SwarmEvent};
-    use libp2p::{identity, Multiaddr, PeerId};
+    use libp2p::{identity::Keypair, Multiaddr, PeerId};
     use std::iter::once;
     use std::str::FromStr;
     use std::thread;
 
     async fn setup_node(
-        key: String,
-        address: String,
-        bootstrap_nodes: [[&str; 2]; 2],
+        local_key: Keypair,
+        local_addr: Multiaddr,
+        peer_addr: Multiaddr,
+        peer_id: PeerId,
     ) -> Result<Swarm<WakuLightPushBehaviour>, Error> {
-        let decoded_key = bs58::decode(&key).into_vec().unwrap();
-        let local_key = identity::Keypair::from_protobuf_encoding(&decoded_key).unwrap();
-
-        let local_address = Multiaddr::from_str(&address).unwrap();
-
-        // Setting up the request/response protocol.
-        let protocols = once((WakuLightPushProtocol(), ProtocolSupport::Full));
-        let cfg = RequestResponseConfig::default();
-        let req_proto = WakuLightPushBehaviour::new(local_key.clone());
-
-        // Setting up the transport and swarm.
         let local_peer_id = PeerId::from(local_key.public());
-        let transport = libp2p::development_transport(local_key).await?;
-        let mut swarm = Swarm::new(transport, req_proto, local_peer_id);
-        swarm.listen_on(local_address).unwrap();
+        let transport = libp2p::development_transport(local_key.clone()).await?;
+        let behaviour = WakuLightPushBehaviour::new(local_key.clone());
+        let mut swarm = Swarm::new(transport, behaviour, local_peer_id);
 
-        // We want to connect to all bootstrap nodes.
-        for info in bootstrap_nodes.iter() {
-            let addr = Multiaddr::from_str(info[0]).unwrap();
-            let peer_id = PeerId::from_str(info[1]).unwrap();
+        swarm.listen_on(local_addr).unwrap();
 
-            if peer_id == local_peer_id {
-                continue;
-            }
+        let msg = WakuMessage::new();
+        let rpc = WakuLightPushBehaviour::new_request_rpc(
+            "test_request_id".to_string(),
+            "test_topic".to_string(),
+            msg,
+        );
 
-            let msg = WakuMessage::new();
-            let rpc = WakuLightPushBehaviour::new_request_rpc(
-                "test_request_id".to_string(),
-                "test_topic".to_string(),
-                msg,
-            );
-
-            swarm
-                .behaviour_mut()
-                .req_res
-                .add_address(&peer_id, addr.clone());
-            swarm.behaviour_mut().req_res.send_request(&peer_id, rpc);
-        }
+        swarm
+            .behaviour_mut()
+            .req_res
+            .add_address(&peer_id, peer_addr);
+        swarm.behaviour_mut().req_res.send_request(&peer_id, rpc);
 
         Ok(swarm)
     }
@@ -232,30 +214,30 @@ mod tests {
         }
     }
 
-    const BOOTSTRAP_PEERS: [[&str; 2]; 2] = [
-        [
-            "/ip4/127.0.0.1/tcp/58584",
-            "12D3KooWLyTCx9j2FMcsHe81RMoDfhXbdyyFgNGQMdcrnhShTvQh",
-        ],
-        [
-            "/ip4/127.0.0.1/tcp/58601",
-            "12D3KooWKBKXsLwbmVBySEmbKayJzfWp3tPCKrnDCsmNy9prwjvy",
-        ],
-    ];
-
     const ADDR_A: &str = "/ip4/127.0.0.1/tcp/58584";
     const ADDR_B: &str = "/ip4/127.0.0.1/tcp/58601";
 
     const KEY_A: &str = "23jhTbXRXh1RPMwzN2B7GNXZDiDtrkdm943bVBfAQBJFUosggfSDVQzui7pEbuzBFf6x7C5SLWXvUGB1gPaTLTpwRxDYu";
     const KEY_B: &str = "23jhTfVepCSFrkYE8tATMUuxU3SErCYvrShcit6dQfaonM4QxF82wh4k917LJShErtKNNbaUjmqGVDLDQdVB9n7TGieQ1";
 
+    const PEER_ID_A: &str = "12D3KooWLyTCx9j2FMcsHe81RMoDfhXbdyyFgNGQMdcrnhShTvQh";
+    const PEER_ID_B: &str = "12D3KooWKBKXsLwbmVBySEmbKayJzfWp3tPCKrnDCsmNy9prwjvy";
+
     #[async_std::test]
     async fn my_test() -> std::io::Result<()> {
-        let mut swarm_a =
-            setup_node(KEY_A.to_string(), ADDR_A.to_string(), BOOTSTRAP_PEERS).await?;
+        let decoded_key_a = bs58::decode(&KEY_A.to_string()).into_vec().unwrap();
+        let key_a = Keypair::from_protobuf_encoding(&decoded_key_a).unwrap();
+        let address_a = Multiaddr::from_str(&ADDR_A.to_string()).unwrap();
+        let peer_id_a = PeerId::from_str(PEER_ID_A).unwrap();
 
-        let mut swarm_b =
-            setup_node(KEY_B.to_string(), ADDR_B.to_string(), BOOTSTRAP_PEERS).await?;
+        let decoded_key_b = bs58::decode(&KEY_B.to_string()).into_vec().unwrap();
+        let key_b = Keypair::from_protobuf_encoding(&decoded_key_b).unwrap();
+        let address_b = Multiaddr::from_str(&ADDR_B.to_string()).unwrap();
+        let peer_id_b = PeerId::from_str(PEER_ID_B).unwrap();
+
+        let mut swarm_a =
+            setup_node(key_a, address_a.clone(), address_b.clone(), peer_id_b).await?;
+        let mut swarm_b = setup_node(key_b, address_b, address_a, peer_id_a).await?;
 
         let future_a = start_loop(&mut swarm_a);
         let future_b = start_loop(&mut swarm_b);
