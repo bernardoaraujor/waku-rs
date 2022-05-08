@@ -228,61 +228,7 @@ mod tests {
     async fn start_loop(swarm: &mut Swarm<WakuLightPushBehaviour>) {
         println!("");
         loop {
-            match swarm.select_next_some().await {
-                SwarmEvent::NewListenAddr { address, .. } => {
-                    println!("Listening on {:?}", address)
-                }
-                SwarmEvent::Behaviour(event) => {
-                    // handle_request_response_event(swarm.behaviour_mut().request_response, event)
-                }
-                SwarmEvent::ConnectionEstablished { peer_id, .. } => {
-                    println!("Connection established with {:?}", peer_id);
-                }
-                SwarmEvent::ConnectionClosed { peer_id, cause, .. } => {
-                    println!("Connection closed with {:?} ({:?})", peer_id, cause);
-                }
-                SwarmEvent::IncomingConnection { send_back_addr, .. } => {
-                    println!("Incoming connection to {:?}", send_back_addr);
-                }
-                SwarmEvent::IncomingConnectionError {
-                    send_back_addr,
-                    error,
-                    ..
-                } => {
-                    println!(
-                        "Incoming connection error to {:?} ({:?})",
-                        send_back_addr, error
-                    );
-                }
-                SwarmEvent::OutgoingConnectionError { peer_id, error } => {
-                    println!("Outgoing connection error with {:?} ({:?})", peer_id, error);
-                }
-                SwarmEvent::BannedPeer { peer_id, endpoint } => {
-                    println!("Banned peer {:?} ({:?})", peer_id, endpoint);
-                }
-                SwarmEvent::ExpiredListenAddr {
-                    listener_id,
-                    address,
-                } => {
-                    println!("Expired listen addr {:?} ({:?})", listener_id, address);
-                }
-                SwarmEvent::ListenerClosed {
-                    listener_id,
-                    addresses,
-                    reason,
-                } => {
-                    println!(
-                        "Listener closed {:?} ({:?}) ({:?})",
-                        listener_id, addresses, reason
-                    );
-                }
-                SwarmEvent::ListenerError { listener_id, error } => {
-                    println!("Listener error {:?} ({:?})", listener_id, error);
-                }
-                SwarmEvent::Dialing(peer_id) => {
-                    println!("Dialing {:?}", peer_id);
-                }
-            }
+            swarm.select_next_some().await;
         }
     }
 
