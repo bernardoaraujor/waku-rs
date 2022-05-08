@@ -17,7 +17,7 @@ use std::iter::once;
 
 #[derive(NetworkBehaviour)]
 #[behaviour(event_process = true)]
-pub struct WakuLightPushBehaviour {
+struct WakuLightPushBehaviour {
     relay: WakuRelayBehaviour,
     req_res: RequestResponse<WakuLightPushCodec>,
 }
@@ -83,10 +83,10 @@ impl WakuLightPushBehaviour {
 }
 
 #[derive(Clone)]
-pub struct WakuLightPushCodec;
+struct WakuLightPushCodec;
 
 #[derive(Debug, Clone)]
-pub struct WakuLightPushProtocol();
+struct WakuLightPushProtocol();
 
 const LIGHTPUSH_PROTOCOL_ID: &str = "/vac/waku/lightpush/2.0.0-beta1";
 
