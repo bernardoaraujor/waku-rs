@@ -1,18 +1,75 @@
 use crate::pb::waku_lightpush_pb::{PushRPC, PushRequest, PushResponse};
 use crate::pb::waku_message_pb::WakuMessage;
 use crate::waku_message::MAX_MESSAGE_SIZE;
+use crate::waku_relay::{WakuRelayBehaviour, WakuRelayEvent};
 use async_trait::async_trait;
 use futures::prelude::*;
 use libp2p::core::upgrade::{read_length_prefixed, write_length_prefixed, ProtocolName};
+use libp2p::identity;
 use libp2p::request_response::{
-    RequestResponse, RequestResponseCodec, RequestResponseEvent, RequestResponseMessage,
+    ProtocolSupport, RequestResponse, RequestResponseCodec, RequestResponseConfig,
+    RequestResponseEvent, RequestResponseMessage,
 };
-use libp2p::NetworkBehaviour;
+use libp2p::{swarm::NetworkBehaviourEventProcess, NetworkBehaviour};
 use protobuf::Message;
 use std::io;
+use std::iter::once;
 
-const MAX_LIGHTPUSH_RPC_SIZE: usize = MAX_MESSAGE_SIZE + 64 * 1024; // We add a 64kB safety buffer for protocol overhead
-const LIGHTPUSH_PROTOCOL_ID: &str = "/vac/waku/lightpush/2.0.0-beta1";
+#[derive(NetworkBehaviour)]
+#[behaviour(event_process = true)]
+pub struct WakuLightPushBehaviour {
+    relay: WakuRelayBehaviour,
+    req_res: RequestResponse<WakuLightPushCodec>,
+}
+
+impl NetworkBehaviourEventProcess<WakuRelayEvent> for WakuLightPushBehaviour {
+    fn inject_event(&mut self, event: WakuRelayEvent) {
+        todo!()
+    }
+}
+
+impl NetworkBehaviourEventProcess<RequestResponseEvent<PushRPC, PushRPC>>
+    for WakuLightPushBehaviour
+{
+    fn inject_event(&mut self, event: RequestResponseEvent<PushRPC, PushRPC>) {
+        if let RequestResponseEvent::Message {
+            peer,
+            message:
+                RequestResponseMessage::Request {
+                    channel, request, ..
+                },
+        } = event
+        {
+            // todo: relay
+            let res_rpc = request.clone();
+            // todo: res_rpc.set_response();
+            self.req_res.send_response(channel, res_rpc);
+        } else if let RequestResponseEvent::Message {
+            peer,
+            message: RequestResponseMessage::Response { response, .. },
+        } = event
+        {
+            if response.get_response().get_is_success() {
+                // todo: treat successful response
+            } else {
+                // todo: treat unsuccessful response
+            }
+        }
+    }
+}
+
+impl WakuLightPushBehaviour {
+    pub fn new(key: identity::Keypair) -> Self {
+        Self {
+            relay: WakuRelayBehaviour::new(key),
+            req_res: RequestResponse::new(
+                WakuLightPushCodec,
+                once((WakuLightPushProtocol(), ProtocolSupport::Full)),
+                RequestResponseConfig::default(),
+            ),
+        }
+    }
+}
 
 #[derive(Clone)]
 pub struct WakuLightPushCodec;
@@ -20,72 +77,14 @@ pub struct WakuLightPushCodec;
 #[derive(Debug, Clone)]
 pub struct WakuLightPushProtocol();
 
-impl WakuLightPushProtocol {
-    pub fn new_request_rpc(request_id: String, pubsub_topic: String, msg: WakuMessage) -> PushRPC {
-        let mut req = PushRequest::new();
-        req.set_pubsub_topic(pubsub_topic);
-        req.set_message(msg);
-
-        let mut req_rpc = PushRPC::new();
-        req_rpc.set_request_id(request_id);
-        req_rpc.set_query(req);
-        req_rpc
-    }
-
-    pub fn handle_request_response_event(
-        req_res: &mut RequestResponse<WakuLightPushCodec>,
-        event: RequestResponseEvent<PushRPC, PushRPC>,
-    ) {
-        // todo: return Result
-        match event {
-            RequestResponseEvent::Message {
-                peer,
-                message:
-                    RequestResponseMessage::Request {
-                        channel, request, ..
-                    },
-            } => {
-                // todo: relay
-                let res_rpc = request.clone();
-                // todo: res_rpc.set_response();
-                req_res.send_response(channel, res_rpc);
-            }
-            RequestResponseEvent::Message {
-                peer,
-                message: RequestResponseMessage::Response { response, .. },
-            } => {
-                if response.get_response().get_is_success() {
-                    // todo: treat successful response
-                } else {
-                    // todo: treat unsuccessful response
-                }
-            }
-            RequestResponseEvent::InboundFailure {
-                peer,
-                request_id,
-                error,
-            } => {
-                // todo: treat inbound failure
-            }
-            RequestResponseEvent::OutboundFailure {
-                peer,
-                request_id,
-                error,
-            } => {
-                // todo: treat outbound failure
-            }
-            RequestResponseEvent::ResponseSent { peer, request_id } => {
-                // todo: do anything here?
-            }
-        }
-    }
-}
+const LIGHTPUSH_PROTOCOL_ID: &str = "/vac/waku/lightpush/2.0.0-beta1";
 
 impl ProtocolName for WakuLightPushProtocol {
     fn protocol_name(&self) -> &[u8] {
         LIGHTPUSH_PROTOCOL_ID.as_bytes()
     }
 }
+const MAX_LIGHTPUSH_RPC_SIZE: usize = MAX_MESSAGE_SIZE + 64 * 1024; // We add a 64kB safety buffer for protocol overhead
 
 #[async_trait]
 impl RequestResponseCodec for WakuLightPushCodec {
@@ -144,28 +143,29 @@ impl RequestResponseCodec for WakuLightPushCodec {
     }
 }
 
-#[derive(NetworkBehaviour)]
-#[behaviour(out_event = "WakuLightPushEvent")]
-struct WakuLightPush {
-    request_response: RequestResponse<WakuLightPushCodec>,
-}
+// utils
 
-#[derive(Debug)]
-pub enum WakuLightPushEvent {
-    RequestResponse(RequestResponseEvent<PushRPC, PushRPC>),
-}
+pub fn new_request_rpc(request_id: String, pubsub_topic: String, msg: WakuMessage) -> PushRPC {
+    let mut req = PushRequest::new();
+    req.set_pubsub_topic(pubsub_topic);
+    req.set_message(msg);
 
-impl From<RequestResponseEvent<PushRPC, PushRPC>> for WakuLightPushEvent {
-    fn from(event: RequestResponseEvent<PushRPC, PushRPC>) -> Self {
-        WakuLightPushEvent::RequestResponse(event)
-    }
+    let mut req_rpc = PushRPC::new();
+    req_rpc.set_request_id(request_id);
+    req_rpc.set_query(req);
+    req_rpc
 }
 
 #[cfg(test)]
 mod tests {
     use crate::pb::waku_lightpush_pb::{PushRPC, PushRequest};
     use crate::pb::waku_message_pb::WakuMessage;
-    use crate::waku_lightpush::{WakuLightPushCodec, WakuLightPushProtocol};
+    use crate::waku_lightpush::{new_request_rpc, WakuLightPushBehaviour};
+    use crate::waku_lightpush::{
+        // WakuLightPushBehaviour,
+        WakuLightPushCodec,
+        WakuLightPushProtocol,
+    };
     use async_std::io::Error;
     use async_std::prelude::FutureExt;
     use futures::join;
@@ -181,30 +181,19 @@ mod tests {
     use std::thread;
 
     async fn setup_node(
-        key: Option<String>,
-        address: Option<String>,
-        default_address: &str,
+        key: String,
+        address: String,
         bootstrap_nodes: [[&str; 2]; 2],
-    ) -> Result<Swarm<RequestResponse<WakuLightPushCodec>>, Error> {
-        // Taking the keypair from the command line or generating a new one.
-        let local_key = if let Some(key) = key {
-            let decoded_key = bs58::decode(&key).into_vec().unwrap();
-            identity::Keypair::from_protobuf_encoding(&decoded_key).unwrap()
-        } else {
-            identity::Keypair::generate_ed25519()
-        };
+    ) -> Result<Swarm<WakuLightPushBehaviour>, Error> {
+        let decoded_key = bs58::decode(&key).into_vec().unwrap();
+        let local_key = identity::Keypair::from_protobuf_encoding(&decoded_key).unwrap();
 
-        // Taking the address from the command line arguments or the default one.
-        let local_address = if let Some(addr) = address {
-            Multiaddr::from_str(&addr).unwrap()
-        } else {
-            Multiaddr::from_str(&default_address).unwrap()
-        };
+        let local_address = Multiaddr::from_str(&address).unwrap();
 
         // Setting up the request/response protocol.
         let protocols = once((WakuLightPushProtocol(), ProtocolSupport::Full));
         let cfg = RequestResponseConfig::default();
-        let req_proto = RequestResponse::new(WakuLightPushCodec, protocols.clone(), cfg.clone());
+        let req_proto = WakuLightPushBehaviour::new(local_key.clone());
 
         // Setting up the transport and swarm.
         let local_peer_id = PeerId::from(local_key.public());
@@ -222,20 +211,19 @@ mod tests {
             }
 
             let msg = WakuMessage::new();
-            let rpc = WakuLightPushProtocol::new_request_rpc(
-                "test_request_id".to_string(),
-                "test_topic".to_string(),
-                msg,
-            );
+            let rpc = new_request_rpc("test_request_id".to_string(), "test_topic".to_string(), msg);
 
-            swarm.behaviour_mut().add_address(&peer_id, addr.clone());
-            swarm.behaviour_mut().send_request(&peer_id, rpc);
+            swarm
+                .behaviour_mut()
+                .req_res
+                .add_address(&peer_id, addr.clone());
+            swarm.behaviour_mut().req_res.send_request(&peer_id, rpc);
         }
 
         Ok(swarm)
     }
 
-    async fn start_loop(swarm: &mut Swarm<RequestResponse<WakuLightPushCodec>>) {
+    async fn start_loop(swarm: &mut Swarm<WakuLightPushBehaviour>) {
         println!("");
         loop {
             match swarm.select_next_some().await {
@@ -243,10 +231,7 @@ mod tests {
                     println!("Listening on {:?}", address)
                 }
                 SwarmEvent::Behaviour(event) => {
-                    WakuLightPushProtocol::handle_request_response_event(
-                        swarm.behaviour_mut(),
-                        event,
-                    )
+                    // handle_request_response_event(swarm.behaviour_mut().request_response, event)
                 }
                 SwarmEvent::ConnectionEstablished { peer_id, .. } => {
                     println!("Connection established with {:?}", peer_id);
@@ -312,28 +297,17 @@ mod tests {
 
     const ADDR_A: &str = "/ip4/127.0.0.1/tcp/58584";
     const ADDR_B: &str = "/ip4/127.0.0.1/tcp/58601";
-    const DEFAULT_ADDRESS: &str = "/ip4/0.0.0.0/tcp/0";
 
     const KEY_A: &str = "23jhTbXRXh1RPMwzN2B7GNXZDiDtrkdm943bVBfAQBJFUosggfSDVQzui7pEbuzBFf6x7C5SLWXvUGB1gPaTLTpwRxDYu";
     const KEY_B: &str = "23jhTfVepCSFrkYE8tATMUuxU3SErCYvrShcit6dQfaonM4QxF82wh4k917LJShErtKNNbaUjmqGVDLDQdVB9n7TGieQ1";
 
     #[async_std::test]
     async fn my_test() -> std::io::Result<()> {
-        let mut swarm_a = setup_node(
-            Some(KEY_A.to_string()),
-            Some(ADDR_A.to_string()),
-            DEFAULT_ADDRESS,
-            BOOTSTRAP_PEERS,
-        )
-        .await?;
+        let mut swarm_a =
+            setup_node(KEY_A.to_string(), ADDR_A.to_string(), BOOTSTRAP_PEERS).await?;
 
-        let mut swarm_b = setup_node(
-            Some(KEY_B.to_string()),
-            Some(ADDR_B.to_string()),
-            DEFAULT_ADDRESS,
-            BOOTSTRAP_PEERS,
-        )
-        .await?;
+        let mut swarm_b =
+            setup_node(KEY_B.to_string(), ADDR_B.to_string(), BOOTSTRAP_PEERS).await?;
 
         let future_a = start_loop(&mut swarm_a);
         let future_b = start_loop(&mut swarm_b);
