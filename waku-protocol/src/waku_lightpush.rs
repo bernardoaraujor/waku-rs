@@ -36,6 +36,7 @@ impl WakuLightPushProtocol {
         req_res: &mut RequestResponse<WakuLightPushCodec>,
         event: RequestResponseEvent<PushRPC, PushRPC>,
     ) {
+        // todo: return Result
         match event {
             RequestResponseEvent::Message {
                 peer,
@@ -44,7 +45,6 @@ impl WakuLightPushProtocol {
                         channel, request, ..
                     },
             } => {
-                // log::info!("WakuLightPushProtocol: Received request from {:?}", peer);
                 // todo: relay
                 let res_rpc = request.clone();
                 // todo: res_rpc.set_response();
@@ -54,8 +54,6 @@ impl WakuLightPushProtocol {
                 peer,
                 message: RequestResponseMessage::Response { response, .. },
             } => {
-                // log::info!("WakuLightPushProtocol: Received response from {:?}", peer);
-                // log::info!("WakuLightPushProtocol: Response info: {:?}", response.get_response().get_info());
                 if response.get_response().get_is_success() {
                     // todo: treat successful response
                 } else {
@@ -67,27 +65,17 @@ impl WakuLightPushProtocol {
                 request_id,
                 error,
             } => {
-                // log::info!(
-                //     "WakuLightPushProtocol: Failed to handle request ({:?}) from {:?}: {:?}",
-                //     request_id,
-                //     peer,
-                //     error
-                // );
+                // todo: treat inbound failure
             }
             RequestResponseEvent::OutboundFailure {
                 peer,
                 request_id,
                 error,
             } => {
-                // log::info!(
-                //     "WakuLightPushProtocol: Failed to send request ({:?}) to {:?}: {:?}",
-                //     request_id,
-                //     peer,
-                //     error
-                // );
+                // todo: treat outbound failure
             }
             RequestResponseEvent::ResponseSent { peer, request_id } => {
-                // log::info!("WakuLightPushProtocol: Sent response to {:?} ({:?})", peer, request_id);
+                // todo: do anything here?
             }
         }
     }
