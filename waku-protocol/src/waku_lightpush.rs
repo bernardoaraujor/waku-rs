@@ -2,18 +2,72 @@ use crate::pb::waku_lightpush_pb::{PushRPC, PushRequest, PushResponse};
 use crate::pb::waku_message_pb::WakuMessage;
 use crate::waku_message::MAX_MESSAGE_SIZE;
 use crate::waku_relay::{WakuRelayBehaviour, WakuRelayEvent};
+use async_std::io::Error;
 use async_trait::async_trait;
 use futures::prelude::*;
 use libp2p::core::upgrade::{read_length_prefixed, write_length_prefixed, ProtocolName};
 use libp2p::identity;
+use libp2p::identity::Keypair;
 use libp2p::request_response::{
     ProtocolSupport, RequestResponse, RequestResponseCodec, RequestResponseConfig,
     RequestResponseEvent, RequestResponseMessage,
 };
+use libp2p::Multiaddr;
+use libp2p::PeerId;
+use libp2p::Swarm;
 use libp2p::{swarm::NetworkBehaviourEventProcess, NetworkBehaviour};
 use protobuf::Message;
 use std::io;
 use std::iter::once;
+
+struct WakuLightPush {
+    swarm: Swarm<WakuLightPushBehaviour>,
+}
+
+impl WakuLightPush {
+    async fn new(local_key: Keypair, local_addr: Multiaddr) -> Result<Self, Error> {
+        let local_peer_id = PeerId::from(local_key.public());
+        let transport = libp2p::development_transport(local_key.clone()).await?;
+        let behaviour = WakuLightPushBehaviour::new(local_key.clone());
+        let mut swarm = Swarm::new(transport, behaviour, local_peer_id);
+
+        swarm.listen_on(local_addr).unwrap();
+        Ok(WakuLightPush { swarm })
+    }
+
+    pub fn add_address(&mut self, peer_id: PeerId, peer_addr: Multiaddr) {
+        self.swarm
+            .behaviour_mut()
+            .req_res
+            .add_address(&peer_id, peer_addr);
+    }
+
+    pub fn send_request(
+        &mut self,
+        peer_id: PeerId,
+        request_id: String,
+        pubsub_topic: String,
+        msg: WakuMessage,
+    ) {
+        let mut req = PushRequest::new();
+        req.set_pubsub_topic(pubsub_topic);
+        req.set_message(msg);
+
+        let mut req_rpc = PushRPC::new();
+        req_rpc.set_request_id(request_id);
+        req_rpc.set_query(req);
+        self.swarm
+            .behaviour_mut()
+            .req_res
+            .send_request(&peer_id, req_rpc);
+    }
+
+    async fn start(&mut self) {
+        loop {
+            self.swarm.select_next_some().await;
+        }
+    }
+}
 
 #[derive(NetworkBehaviour)]
 #[behaviour(event_process = true)]
@@ -68,17 +122,6 @@ impl WakuLightPushBehaviour {
                 RequestResponseConfig::default(),
             ),
         }
-    }
-
-    fn new_request_rpc(request_id: String, pubsub_topic: String, msg: WakuMessage) -> PushRPC {
-        let mut req = PushRequest::new();
-        req.set_pubsub_topic(pubsub_topic);
-        req.set_message(msg);
-
-        let mut req_rpc = PushRPC::new();
-        req_rpc.set_request_id(request_id);
-        req_rpc.set_query(req);
-        req_rpc
     }
 }
 
@@ -158,7 +201,7 @@ impl RequestResponseCodec for WakuLightPushCodec {
 mod tests {
     use crate::pb::waku_lightpush_pb::{PushRPC, PushRequest};
     use crate::pb::waku_message_pb::WakuMessage;
-    use crate::waku_lightpush::WakuLightPushBehaviour;
+    use crate::waku_lightpush::{WakuLightPush, WakuLightPushBehaviour};
     use crate::waku_lightpush::{
         // WakuLightPushBehaviour,
         WakuLightPushCodec,
@@ -177,42 +220,6 @@ mod tests {
     use std::iter::once;
     use std::str::FromStr;
     use std::thread;
-
-    async fn setup_node(
-        local_key: Keypair,
-        local_addr: Multiaddr,
-        peer_addr: Multiaddr,
-        peer_id: PeerId,
-    ) -> Result<Swarm<WakuLightPushBehaviour>, Error> {
-        let local_peer_id = PeerId::from(local_key.public());
-        let transport = libp2p::development_transport(local_key.clone()).await?;
-        let behaviour = WakuLightPushBehaviour::new(local_key.clone());
-        let mut swarm = Swarm::new(transport, behaviour, local_peer_id);
-
-        swarm.listen_on(local_addr).unwrap();
-
-        let msg = WakuMessage::new();
-        let rpc = WakuLightPushBehaviour::new_request_rpc(
-            "test_request_id".to_string(),
-            "test_topic".to_string(),
-            msg,
-        );
-
-        swarm
-            .behaviour_mut()
-            .req_res
-            .add_address(&peer_id, peer_addr);
-        swarm.behaviour_mut().req_res.send_request(&peer_id, rpc);
-
-        Ok(swarm)
-    }
-
-    async fn start_loop(swarm: &mut Swarm<WakuLightPushBehaviour>) {
-        println!("");
-        loop {
-            swarm.select_next_some().await;
-        }
-    }
 
     const ADDR_A: &str = "/ip4/127.0.0.1/tcp/58584";
     const ADDR_B: &str = "/ip4/127.0.0.1/tcp/58601";
@@ -235,12 +242,20 @@ mod tests {
         let address_b = Multiaddr::from_str(&ADDR_B.to_string()).unwrap();
         let peer_id_b = PeerId::from_str(PEER_ID_B).unwrap();
 
-        let mut swarm_a =
-            setup_node(key_a, address_a.clone(), address_b.clone(), peer_id_b).await?;
-        let mut swarm_b = setup_node(key_b, address_b, address_a, peer_id_a).await?;
+        let mut waku_lp_a = WakuLightPush::new(key_a.clone(), address_a.clone()).await?;
+        let mut waku_lp_b = WakuLightPush::new(key_b.clone(), address_b.clone()).await?;
 
-        let future_a = start_loop(&mut swarm_a);
-        let future_b = start_loop(&mut swarm_b);
+        waku_lp_a.add_address(peer_id_b, address_b);
+        let msg = WakuMessage::new();
+        waku_lp_a.send_request(
+            peer_id_b,
+            "test_request_id".to_string(),
+            "test_topic".to_string(),
+            msg,
+        );
+
+        let future_a = waku_lp_a.start();
+        let future_b = waku_lp_b.start();
 
         join!(future_a, future_b);
 
