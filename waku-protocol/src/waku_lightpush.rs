@@ -1,24 +1,24 @@
-use crate::pb::waku_lightpush_pb::{PushRPC, PushRequest, PushResponse};
-use crate::pb::waku_message_pb::WakuMessage;
+use crate::pb::{
+    waku_lightpush_pb::{PushRPC, PushRequest, PushResponse},
+    waku_message_pb::WakuMessage,
+};
 use crate::waku_message::MAX_MESSAGE_SIZE;
 use crate::waku_relay::{WakuRelayBehaviour, WakuRelayEvent};
 use async_std::io::Error;
 use async_trait::async_trait;
 use futures::prelude::*;
-use libp2p::core::upgrade::{read_length_prefixed, write_length_prefixed, ProtocolName};
-use libp2p::identity;
-use libp2p::identity::Keypair;
-use libp2p::request_response::{
-    ProtocolSupport, RequestResponse, RequestResponseCodec, RequestResponseConfig,
-    RequestResponseEvent, RequestResponseMessage,
+use libp2p::{
+    core::upgrade::{read_length_prefixed, write_length_prefixed, ProtocolName},
+    identity::Keypair,
+    request_response::{
+        ProtocolSupport, RequestResponse, RequestResponseCodec, RequestResponseConfig,
+        RequestResponseEvent, RequestResponseMessage,
+    },
+    swarm::NetworkBehaviourEventProcess,
+    Multiaddr, NetworkBehaviour, PeerId, Swarm,
 };
-use libp2p::Multiaddr;
-use libp2p::PeerId;
-use libp2p::Swarm;
-use libp2p::{swarm::NetworkBehaviourEventProcess, NetworkBehaviour};
 use protobuf::Message;
-use std::io;
-use std::iter::once;
+use std::{io, iter::once};
 
 struct WakuLightPush {
     swarm: Swarm<WakuLightPushBehaviour>,
@@ -113,7 +113,7 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<PushRPC, PushRPC>>
 }
 
 impl WakuLightPushBehaviour {
-    fn new(key: identity::Keypair) -> Self {
+    fn new(key: Keypair) -> Self {
         Self {
             relay: WakuRelayBehaviour::new(key),
             req_res: RequestResponse::new(
@@ -199,27 +199,26 @@ impl RequestResponseCodec for WakuLightPushCodec {
 
 #[cfg(test)]
 mod tests {
-    use crate::pb::waku_lightpush_pb::{PushRPC, PushRequest};
-    use crate::pb::waku_message_pb::WakuMessage;
-    use crate::waku_lightpush::{WakuLightPush, WakuLightPushBehaviour};
+    use crate::pb::{
+        waku_lightpush_pb::{PushRPC, PushRequest},
+        waku_message_pb::WakuMessage,
+    };
     use crate::waku_lightpush::{
-        // WakuLightPushBehaviour,
-        WakuLightPushCodec,
-        WakuLightPushProtocol,
+        WakuLightPush, WakuLightPushBehaviour, WakuLightPushCodec, WakuLightPushProtocol,
     };
     use async_std::io::Error;
     use async_std::prelude::FutureExt;
     use futures::join;
     use futures::StreamExt;
-    use libp2p::request_response::{
-        ProtocolSupport, RequestResponse, RequestResponseConfig, RequestResponseEvent,
-        RequestResponseMessage,
-    };
-    use libp2p::swarm::{Swarm, SwarmEvent};
     use libp2p::{identity::Keypair, Multiaddr, PeerId};
-    use std::iter::once;
-    use std::str::FromStr;
-    use std::thread;
+    use libp2p::{
+        request_response::{
+            ProtocolSupport, RequestResponse, RequestResponseConfig, RequestResponseEvent,
+            RequestResponseMessage,
+        },
+        swarm::{Swarm, SwarmEvent},
+    };
+    use std::{iter::once, str::FromStr, thread};
 
     const ADDR_A: &str = "/ip4/127.0.0.1/tcp/58584";
     const ADDR_B: &str = "/ip4/127.0.0.1/tcp/58601";
