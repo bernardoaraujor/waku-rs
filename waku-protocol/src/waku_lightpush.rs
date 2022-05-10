@@ -101,7 +101,7 @@ impl WakuLightPushBehaviour {
         }
     }
 
-    pub fn add_req_res_peer(&mut self, peer_id: PeerId, peer_addr: Multiaddr) {
+    pub fn add_lightpush_peer(&mut self, peer_id: PeerId, peer_addr: Multiaddr) {
         self.req_res.add_address(&peer_id, peer_addr);
     }
 
@@ -257,7 +257,7 @@ mod tests {
 
         swarm_a
             .behaviour_mut()
-            .add_req_res_peer(peer_id_b, address_b);
+            .add_lightpush_peer(peer_id_b, address_b);
 
         let msg = WakuMessage::new();
 
