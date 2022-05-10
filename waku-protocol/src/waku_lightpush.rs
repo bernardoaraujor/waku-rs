@@ -24,51 +24,6 @@ struct WakuLightPush {
     swarm: Swarm<WakuLightPushBehaviour>,
 }
 
-impl WakuLightPush {
-    async fn new(local_key: Keypair, local_addr: Multiaddr) -> Result<Self, Error> {
-        let local_peer_id = PeerId::from(local_key.public());
-        let transport = libp2p::development_transport(local_key.clone()).await?;
-        let behaviour = WakuLightPushBehaviour::new(local_key.clone());
-        let mut swarm = Swarm::new(transport, behaviour, local_peer_id);
-
-        swarm.listen_on(local_addr).unwrap();
-        Ok(WakuLightPush { swarm })
-    }
-
-    pub fn add_address(&mut self, peer_id: PeerId, peer_addr: Multiaddr) {
-        self.swarm
-            .behaviour_mut()
-            .req_res
-            .add_address(&peer_id, peer_addr);
-    }
-
-    pub fn send_request(
-        &mut self,
-        peer_id: PeerId,
-        request_id: String,
-        pubsub_topic: String,
-        msg: WakuMessage,
-    ) {
-        let mut req = PushRequest::new();
-        req.set_pubsub_topic(pubsub_topic);
-        req.set_message(msg);
-
-        let mut req_rpc = PushRPC::new();
-        req_rpc.set_request_id(request_id);
-        req_rpc.set_query(req);
-        self.swarm
-            .behaviour_mut()
-            .req_res
-            .send_request(&peer_id, req_rpc);
-    }
-
-    async fn start(&mut self) {
-        loop {
-            self.swarm.select_next_some().await;
-        }
-    }
-}
-
 #[derive(NetworkBehaviour)]
 #[behaviour(event_process = true)]
 struct WakuLightPushBehaviour {
@@ -147,6 +102,27 @@ impl WakuLightPushBehaviour {
                 RequestResponseConfig::default(),
             ),
         }
+    }
+
+    pub fn add_req_res_peer(&mut self, peer_id: PeerId, peer_addr: Multiaddr) {
+        self.req_res.add_address(&peer_id, peer_addr);
+    }
+
+    pub fn send_request(
+        &mut self,
+        peer_id: PeerId,
+        request_id: String,
+        pubsub_topic: String,
+        msg: WakuMessage,
+    ) {
+        let mut req = PushRequest::new();
+        req.set_pubsub_topic(pubsub_topic);
+        req.set_message(msg);
+
+        let mut req_rpc = PushRPC::new();
+        req_rpc.set_request_id(request_id);
+        req_rpc.set_query(req);
+        self.req_res.send_request(&peer_id, req_rpc);
     }
 }
 
@@ -254,6 +230,12 @@ mod tests {
     const PEER_ID_A: &str = "12D3KooWLyTCx9j2FMcsHe81RMoDfhXbdyyFgNGQMdcrnhShTvQh";
     const PEER_ID_B: &str = "12D3KooWKBKXsLwbmVBySEmbKayJzfWp3tPCKrnDCsmNy9prwjvy";
 
+    async fn start(mut swarm: Swarm<WakuLightPushBehaviour>) {
+        loop {
+            swarm.select_next_some().await;
+        }
+    }
+
     #[async_std::test]
     async fn my_test() -> std::io::Result<()> {
         let decoded_key_a = bs58::decode(&KEY_A.to_string()).into_vec().unwrap();
@@ -266,20 +248,31 @@ mod tests {
         let address_b = Multiaddr::from_str(&ADDR_B.to_string()).unwrap();
         let peer_id_b = PeerId::from_str(PEER_ID_B).unwrap();
 
-        let mut waku_lp_a = WakuLightPush::new(key_a.clone(), address_a.clone()).await?;
-        let mut waku_lp_b = WakuLightPush::new(key_b.clone(), address_b.clone()).await?;
+        let transport_a = libp2p::development_transport(key_a.clone()).await?;
+        let waku_lp_behaviour_a = WakuLightPushBehaviour::new(key_a.clone());
+        let mut swarm_a = Swarm::new(transport_a, waku_lp_behaviour_a, peer_id_a);
+        swarm_a.listen_on(address_a).unwrap();
 
-        waku_lp_a.add_address(peer_id_b, address_b);
+        let transport_b = libp2p::development_transport(key_b.clone()).await?;
+        let waku_lp_behaviour_b = WakuLightPushBehaviour::new(key_b.clone());
+        let mut swarm_b = Swarm::new(transport_b, waku_lp_behaviour_b, peer_id_b);
+        swarm_b.listen_on(address_b.clone()).unwrap();
+
+        swarm_a
+            .behaviour_mut()
+            .add_req_res_peer(peer_id_b, address_b);
+
         let msg = WakuMessage::new();
-        waku_lp_a.send_request(
+
+        swarm_a.behaviour_mut().send_request(
             peer_id_b,
             "test_request_id".to_string(),
             "test_topic".to_string(),
             msg,
         );
 
-        let future_a = waku_lp_a.start();
-        let future_b = waku_lp_b.start();
+        let future_a = start(swarm_a);
+        let future_b = start(swarm_b);
 
         join!(future_a, future_b);
 
