@@ -1,15 +1,19 @@
 use crate::pb::waku_message_pb::WakuMessage;
-use crate::pb::waku_store_pb::{HistoryQuery, HistoryRPC, HistoryResponse, Index};
+use crate::pb::waku_store_pb::{ContentFilter, HistoryQuery, HistoryRPC, HistoryResponse, Index};
 use crate::waku_message::MAX_MESSAGE_SIZE;
 use async_trait::async_trait;
 use futures::prelude::*;
 use libp2p::core::upgrade::{read_length_prefixed, write_length_prefixed, ProtocolName};
-use libp2p::request_response::{RequestResponse, RequestResponseCodec, RequestResponseEvent};
-use libp2p::NetworkBehaviour;
-use protobuf::Message;
+use libp2p::request_response::{
+    ProtocolSupport, RequestResponse, RequestResponseCodec, RequestResponseConfig,
+    RequestResponseEvent, RequestResponseMessage,
+};
+use libp2p::swarm::NetworkBehaviourEventProcess;
+use libp2p::{Multiaddr, NetworkBehaviour, PeerId};
+use protobuf::{Message, RepeatedField};
 use sha2::{Digest, Sha256};
-use std::io;
 use std::time::{SystemTime, UNIX_EPOCH};
+use std::{io, iter::once};
 
 const MAX_PAGE_SIZE: usize = 100; // Maximum number of waku messages in each page
 const MAX_STORE_RPC_SIZE: usize = MAX_PAGE_SIZE * MAX_MESSAGE_SIZE + 64 * 1024; // We add a 64kB safety buffer for protocol overhead
@@ -19,7 +23,7 @@ const DEFAULT_PUBSUB_TOPIC: &str = "/waku/2/default-waku/proto";
 #[derive(Clone)]
 pub struct WakuStoreProtocol();
 #[derive(Clone)]
-pub struct WakuStoreCodec();
+pub struct WakuStoreCodec;
 
 impl ProtocolName for WakuStoreProtocol {
     fn protocol_name(&self) -> &[u8] {
@@ -85,19 +89,75 @@ impl RequestResponseCodec for WakuStoreCodec {
 }
 
 #[derive(NetworkBehaviour)]
-#[behaviour(out_event = "WakuStoreEvent")]
-struct WakuStore {
-    request_response: RequestResponse<WakuStoreCodec>,
+#[behaviour(event_process = true)]
+struct WakuStoreBehaviour {
+    req_res: RequestResponse<WakuStoreCodec>,
 }
 
-#[derive(Debug)]
-pub enum WakuStoreEvent {
-    RequestResponse(RequestResponseEvent<HistoryRPC, HistoryRPC>),
+impl NetworkBehaviourEventProcess<RequestResponseEvent<HistoryRPC, HistoryRPC>>
+    for WakuStoreBehaviour
+{
+    fn inject_event(&mut self, event: RequestResponseEvent<HistoryRPC, HistoryRPC>) {
+        if let RequestResponseEvent::Message {
+            peer,
+            message:
+                RequestResponseMessage::Request {
+                    channel, request, ..
+                },
+        } = event
+        {
+            // todo: parse query
+        } else if let RequestResponseEvent::Message {
+            peer,
+            message: RequestResponseMessage::Response { response, .. },
+        } = event
+        {
+            //todo: parse response
+        }
+    }
 }
 
-impl From<RequestResponseEvent<HistoryRPC, HistoryRPC>> for WakuStoreEvent {
-    fn from(event: RequestResponseEvent<HistoryRPC, HistoryRPC>) -> Self {
-        WakuStoreEvent::RequestResponse(event)
+impl WakuStoreBehaviour {
+    fn new() -> Self {
+        Self {
+            req_res: RequestResponse::new(
+                WakuStoreCodec,
+                once((WakuStoreProtocol(), ProtocolSupport::Full)),
+                RequestResponseConfig::default(),
+            ),
+        }
+    }
+
+    pub fn add_store_peer(&mut self, peer_id: PeerId, peer_addr: Multiaddr) {
+        self.req_res.add_address(&peer_id, peer_addr);
+    }
+
+    pub fn send_query(
+        &mut self,
+        peer_id: PeerId,
+        request_id: String,
+        pubsub_topic: String,
+        content_topic: Vec<String>,
+        start_time: i64,
+        end_time: i64,
+    ) {
+        let mut query = HistoryQuery::new();
+        query.set_pubsub_topic(pubsub_topic);
+        let mut content_filters = RepeatedField::new();
+        for t in content_topic {
+            let mut c = ContentFilter::new();
+            c.set_contentTopic(t);
+            content_filters.push(c);
+        }
+        query.set_content_filters(content_filters);
+        query.set_start_time(start_time);
+        query.set_end_time(end_time);
+
+        let mut query_rpc = HistoryRPC::new();
+        query_rpc.set_request_id(request_id);
+        query_rpc.set_query(query);
+
+        self.req_res.send_request(&peer_id, query_rpc);
     }
 }
 
@@ -127,8 +187,14 @@ fn compute_index(msg: WakuMessage) -> Index {
 #[cfg(test)]
 mod tests {
     use crate::pb::waku_message_pb::WakuMessage;
+    use crate::pb::waku_store_pb::HistoryQuery;
+    use crate::waku_store::WakuStoreBehaviour;
     use crate::waku_store::{compute_index, DEFAULT_PUBSUB_TOPIC};
+    use futures::join;
+    use futures::StreamExt;
+    use libp2p::{identity::Keypair, swarm::Swarm, Multiaddr, PeerId};
     use sha2::{Digest, Sha256};
+    use std::str::FromStr;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
@@ -159,5 +225,63 @@ mod tests {
         assert_eq!(index.digest, digest);
         assert_eq!(index.pubsub_topic, test_topic);
         assert_eq!(index.sender_time, test_timestamp);
+    }
+
+    const ADDR_A: &str = "/ip4/127.0.0.1/tcp/58584";
+    const ADDR_B: &str = "/ip4/127.0.0.1/tcp/58601";
+
+    const KEY_A: &str = "23jhTbXRXh1RPMwzN2B7GNXZDiDtrkdm943bVBfAQBJFUosggfSDVQzui7pEbuzBFf6x7C5SLWXvUGB1gPaTLTpwRxDYu";
+    const KEY_B: &str = "23jhTfVepCSFrkYE8tATMUuxU3SErCYvrShcit6dQfaonM4QxF82wh4k917LJShErtKNNbaUjmqGVDLDQdVB9n7TGieQ1";
+
+    const PEER_ID_A: &str = "12D3KooWLyTCx9j2FMcsHe81RMoDfhXbdyyFgNGQMdcrnhShTvQh";
+    const PEER_ID_B: &str = "12D3KooWKBKXsLwbmVBySEmbKayJzfWp3tPCKrnDCsmNy9prwjvy";
+
+    async fn start(mut swarm: Swarm<WakuStoreBehaviour>) {
+        loop {
+            swarm.select_next_some().await;
+        }
+    }
+
+    #[async_std::test]
+    async fn my_test() -> std::io::Result<()> {
+        let decoded_key_a = bs58::decode(&KEY_A.to_string()).into_vec().unwrap();
+        let key_a = Keypair::from_protobuf_encoding(&decoded_key_a).unwrap();
+        let address_a = Multiaddr::from_str(&ADDR_A.to_string()).unwrap();
+        let peer_id_a = PeerId::from_str(PEER_ID_A).unwrap();
+
+        let decoded_key_b = bs58::decode(&KEY_B.to_string()).into_vec().unwrap();
+        let key_b = Keypair::from_protobuf_encoding(&decoded_key_b).unwrap();
+        let address_b = Multiaddr::from_str(&ADDR_B.to_string()).unwrap();
+        let peer_id_b = PeerId::from_str(PEER_ID_B).unwrap();
+
+        let transport_a = libp2p::development_transport(key_a.clone()).await?;
+        let waku_lp_behaviour_a = WakuStoreBehaviour::new();
+        let mut swarm_a = Swarm::new(transport_a, waku_lp_behaviour_a, peer_id_a);
+        swarm_a.listen_on(address_a).unwrap();
+
+        let transport_b = libp2p::development_transport(key_b.clone()).await?;
+        let waku_lp_behaviour_b = WakuStoreBehaviour::new();
+        let mut swarm_b = Swarm::new(transport_b, waku_lp_behaviour_b, peer_id_b);
+        swarm_b.listen_on(address_b.clone()).unwrap();
+
+        swarm_a.behaviour_mut().add_store_peer(peer_id_b, address_b);
+
+        let mut content_topics = Vec::new();
+        content_topics.push("test_content_topic".to_string());
+        swarm_a.behaviour_mut().send_query(
+            peer_id_b,
+            "test_request_id".to_string(),
+            "test_pubsub_topic".to_string(),
+            content_topics,
+            0,
+            10,
+        );
+
+        let future_a = start(swarm_a);
+        let future_b = start(swarm_b);
+
+        join!(future_a, future_b);
+
+        Ok(())
     }
 }
