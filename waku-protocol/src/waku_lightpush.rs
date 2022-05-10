@@ -53,29 +53,26 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<PushRPC, PushRPC>>
             // it forwards the WakuMessage to WakuRelayBehaviour
 
             let req = request.get_query().clone();
+            let req_id = request.get_request_id();
             let req_topic = req.get_pubsub_topic();
             let req_msg = req.get_message().clone();
             let mut res = PushResponse::new();
 
             match self.relay.publish(req_topic, req_msg) {
-                Ok(id) => {
+                Ok(_) => {
                     res.set_is_success(true);
-                    // todo: res.set_info()
-                    // what is info??
+                    // todo: res.set_info() ?
                 }
-                Err(_) => {
+                Err(e) => {
                     res.set_is_success(false);
-                    // todo: res.set_info()
-                    // what is info??
+                    res.set_info(e.to_string());
                 }
             }
 
             let mut res_rpc = PushRPC::new();
             res_rpc.set_query(req);
             res_rpc.set_response(res);
-
-            // todo: res_rpc.set_request_id();
-            // what is request id??
+            res_rpc.set_request_id(req_id.to_string());
 
             self.req_res.send_response(channel, res_rpc);
         } else if let RequestResponseEvent::Message {
