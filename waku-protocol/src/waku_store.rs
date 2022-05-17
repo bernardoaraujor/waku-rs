@@ -1,5 +1,5 @@
 use crate::pb::waku_message_pb::WakuMessage;
-use crate::pb::waku_store_pb::{ContentFilter, HistoryQuery, HistoryRPC, HistoryResponse, Index};
+use crate::pb::waku_store_pb::{ContentFilter, HistoryQuery, HistoryRPC, Index};
 use crate::waku_message::MAX_MESSAGE_SIZE;
 use async_trait::async_trait;
 use futures::prelude::*;
@@ -187,7 +187,6 @@ fn compute_index(msg: WakuMessage) -> Index {
 #[cfg(test)]
 mod tests {
     use crate::pb::waku_message_pb::WakuMessage;
-    use crate::pb::waku_store_pb::HistoryQuery;
     use crate::waku_store::WakuStoreBehaviour;
     use crate::waku_store::{compute_index, DEFAULT_PUBSUB_TOPIC};
     use futures::join;

@@ -4,7 +4,6 @@ use crate::pb::{
 };
 use crate::waku_message::MAX_MESSAGE_SIZE;
 use crate::waku_relay::{WakuRelayBehaviour, WakuRelayEvent};
-use async_std::io::Error;
 use async_trait::async_trait;
 use futures::prelude::*;
 use libp2p::{
@@ -198,25 +197,14 @@ impl RequestResponseCodec for WakuLightPushCodec {
 #[cfg(test)]
 mod tests {
     use crate::pb::{
-        waku_lightpush_pb::{PushRPC, PushRequest},
         waku_message_pb::WakuMessage,
     };
-    use crate::waku_lightpush::{
-        WakuLightPush, WakuLightPushBehaviour, WakuLightPushCodec, WakuLightPushProtocol,
-    };
-    use async_std::io::Error;
-    use async_std::prelude::FutureExt;
+    use crate::waku_lightpush::WakuLightPushBehaviour;
     use futures::join;
     use futures::StreamExt;
     use libp2p::{identity::Keypair, Multiaddr, PeerId};
-    use libp2p::{
-        request_response::{
-            ProtocolSupport, RequestResponse, RequestResponseConfig, RequestResponseEvent,
-            RequestResponseMessage,
-        },
-        swarm::{Swarm, SwarmEvent},
-    };
-    use std::{iter::once, str::FromStr, thread};
+    use libp2p::swarm::Swarm;
+    use std::str::FromStr;
 
     const ADDR_A: &str = "/ip4/127.0.0.1/tcp/58584";
     const ADDR_B: &str = "/ip4/127.0.0.1/tcp/58601";

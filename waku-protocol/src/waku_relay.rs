@@ -1,13 +1,11 @@
 use crate::pb::waku_message_pb::WakuMessage;
-use async_std::io::Error;
 use libp2p::gossipsub::error::{PublishError, SubscriptionError};
 use libp2p::gossipsub::{
-    Gossipsub, GossipsubEvent, GossipsubMessage, IdentTopic as Topic, MessageAuthenticity,
+    Gossipsub, GossipsubEvent, MessageAuthenticity,
     MessageId, Sha256Topic, ValidationMode,
 };
-use libp2p::{gossipsub, identity::Keypair, Multiaddr, NetworkBehaviour, PeerId, Swarm};
+use libp2p::{gossipsub, identity::Keypair, NetworkBehaviour, PeerId};
 use protobuf::Message;
-use std::time::Duration;
 
 const RELAY_PROTOCOL_ID: &str = "/vac/waku/relay/2.0.0";
 
@@ -65,24 +63,11 @@ impl WakuRelayBehaviour {
 #[cfg(test)]
 mod tests {
     use crate::pb::waku_message_pb::WakuMessage;
-    use crate::waku_relay::{WakuRelayBehaviour, WakuRelayEvent};
-    use async_std::io::Error;
-    use async_std::prelude::FutureExt;
-    use futures::join;
+    use crate::waku_relay::WakuRelayBehaviour;
     use futures::select;
     use futures::StreamExt;
-    use libp2p::gossipsub::Sha256Topic;
-    use libp2p::{
-        gossipsub::{GossipsubEvent, Topic},
-        request_response::{
-            ProtocolSupport, RequestResponse, RequestResponseConfig, RequestResponseEvent,
-            RequestResponseMessage,
-        },
-        swarm::{Swarm, SwarmEvent},
-    };
     use libp2p::{identity::Keypair, Multiaddr, PeerId};
-    use std::hash::{Hash, Hasher};
-    use std::{iter::once, str::FromStr, thread};
+    use std::str::FromStr;
 
     const ADDR_A: &str = "/ip4/127.0.0.1/tcp/58584";
     const ADDR_B: &str = "/ip4/127.0.0.1/tcp/58601";
