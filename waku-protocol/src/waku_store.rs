@@ -1,5 +1,5 @@
 use crate::pb::waku_message_pb::WakuMessage;
-use crate::pb::waku_store_pb::{ContentFilter, HistoryQuery, HistoryRPC, Index};
+use crate::pb::waku_store_pb::{ContentFilter, HistoryQuery, HistoryResponse, HistoryRPC, Index};
 use crate::waku_message::MAX_MESSAGE_SIZE;
 use async_trait::async_trait;
 use futures::prelude::*;
@@ -88,9 +88,41 @@ impl RequestResponseCodec for WakuStoreCodec {
     }
 }
 
+struct IndexedWakuMessage {
+    message: WakuMessage,
+    index: Index,
+    pub_sub_topic: String,
+}
+
+struct WakuMessageQueue {
+    max_messages: usize,
+    messages: Vec<IndexedWakuMessage>, // todo: ring buffer, which crate? VecDeque?
+    // https://play.rust-lang.org/?version=stable&mode=debug&edition=2018&gist=14bbad4d2c074f1632122c3fb98ef8cf
+}
+
+#[derive(Debug, Clone)]
+struct MaxQueueSize;
+
+impl WakuMessageQueue {
+    fn new(max_messages: usize) -> Self {
+        WakuMessageQueue { max_messages, messages: Vec::new() }
+    }
+
+    fn push(&mut self, indexed_message: IndexedWakuMessage) -> Result<(), MaxQueueSize> {
+        if self.messages.len() + 1 == self.max_messages {
+            return Err(MaxQueueSize)
+        }
+        self.messages.push(indexed_message);
+
+        Ok(())
+    }
+}
+
 #[derive(NetworkBehaviour)]
 #[behaviour(event_process = true)]
 struct WakuStoreBehaviour {
+    #[behaviour(ignore)]
+    message_queue: WakuMessageQueue,
     req_res: RequestResponse<WakuStoreCodec>,
 }
 
@@ -118,8 +150,9 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<HistoryRPC, HistoryRPC>>
 }
 
 impl WakuStoreBehaviour {
-    fn new() -> Self {
+    fn new(max_messages: usize) -> Self {
         Self {
+            message_queue: WakuMessageQueue { max_messages, messages: Vec::with_capacity(max_messages) },
             req_res: RequestResponse::new(
                 WakuStoreCodec,
                 once((WakuStoreProtocol(), ProtocolSupport::Full)),
@@ -187,7 +220,7 @@ fn compute_index(msg: WakuMessage) -> Index {
 #[cfg(test)]
 mod tests {
     use crate::pb::waku_message_pb::WakuMessage;
-    use crate::waku_store::WakuStoreBehaviour;
+    use crate::waku_store::{IndexedWakuMessage, WakuStoreBehaviour};
     use crate::waku_store::{compute_index, DEFAULT_PUBSUB_TOPIC};
     use futures::join;
     use futures::StreamExt;
@@ -254,16 +287,23 @@ mod tests {
         let peer_id_b = PeerId::from_str(PEER_ID_B).unwrap();
 
         let transport_a = libp2p::development_transport(key_a.clone()).await?;
-        let waku_lp_behaviour_a = WakuStoreBehaviour::new();
+        let waku_lp_behaviour_a = WakuStoreBehaviour::new(10);
         let mut swarm_a = Swarm::new(transport_a, waku_lp_behaviour_a, peer_id_a);
         swarm_a.listen_on(address_a).unwrap();
 
         let transport_b = libp2p::development_transport(key_b.clone()).await?;
-        let waku_lp_behaviour_b = WakuStoreBehaviour::new();
+        let waku_lp_behaviour_b = WakuStoreBehaviour::new(10);
         let mut swarm_b = Swarm::new(transport_b, waku_lp_behaviour_b, peer_id_b);
         swarm_b.listen_on(address_b.clone()).unwrap();
 
         swarm_a.behaviour_mut().add_store_peer(peer_id_b, address_b);
+
+        let mut msg = WakuMessage::new();
+        msg.set_payload(b"".to_vec());
+        msg.set_content_topic("test_content_topic".to_string());
+
+        let indexed_message = IndexedWakuMessage { message: msg.clone(), index: compute_index(msg), pub_sub_topic: "test_pubsub_topic".to_string()};
+        swarm_a.behaviour_mut().message_queue.push(indexed_message).unwrap();
 
         let mut content_topics = Vec::new();
         content_topics.push("test_content_topic".to_string());
