@@ -15,6 +15,8 @@ use sha2::{Digest, Sha256};
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::{io, iter::once};
 
+mod message_queue;
+
 const MAX_PAGE_SIZE: usize = 100; // Maximum number of waku messages in each page
 const MAX_STORE_RPC_SIZE: usize = MAX_PAGE_SIZE * MAX_MESSAGE_SIZE + 64 * 1024; // We add a 64kB safety buffer for protocol overhead
 const STORE_PROTOCOL_ID: &str = "/vac/waku/store/2.0.0-beta4";
@@ -88,41 +90,11 @@ impl RequestResponseCodec for WakuStoreCodec {
     }
 }
 
-struct IndexedWakuMessage {
-    message: WakuMessage,
-    index: Index,
-    pub_sub_topic: String,
-}
-
-struct WakuMessageQueue {
-    max_messages: usize,
-    messages: Vec<IndexedWakuMessage>, // todo: ring buffer, which crate? VecDeque?
-    // https://play.rust-lang.org/?version=stable&mode=debug&edition=2018&gist=14bbad4d2c074f1632122c3fb98ef8cf
-}
-
-#[derive(Debug, Clone)]
-struct MaxQueueSize;
-
-impl WakuMessageQueue {
-    fn new(max_messages: usize) -> Self {
-        WakuMessageQueue { max_messages, messages: Vec::new() }
-    }
-
-    fn push(&mut self, indexed_message: IndexedWakuMessage) -> Result<(), MaxQueueSize> {
-        if self.messages.len() + 1 == self.max_messages {
-            return Err(MaxQueueSize)
-        }
-        self.messages.push(indexed_message);
-
-        Ok(())
-    }
-}
-
 #[derive(NetworkBehaviour)]
 #[behaviour(event_process = true)]
 struct WakuStoreBehaviour {
     #[behaviour(ignore)]
-    message_queue: WakuMessageQueue,
+    message_queue: message_queue::WakuMessageQueue,
     req_res: RequestResponse<WakuStoreCodec>,
 }
 
@@ -165,7 +137,7 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<HistoryRPC, HistoryRPC>>
 impl WakuStoreBehaviour {
     fn new(max_messages: usize) -> Self {
         Self {
-            message_queue: WakuMessageQueue { max_messages, messages: Vec::with_capacity(max_messages) },
+            message_queue: message_queue::WakuMessageQueue::new(max_messages),
             req_res: RequestResponse::new(
                 WakuStoreCodec,
                 once((WakuStoreProtocol(), ProtocolSupport::Full)),
@@ -233,7 +205,8 @@ fn compute_index(msg: WakuMessage) -> Index {
 #[cfg(test)]
 mod tests {
     use crate::pb::waku_message_pb::WakuMessage;
-    use crate::waku_store::{IndexedWakuMessage, WakuStoreBehaviour};
+    use crate::waku_store::WakuStoreBehaviour;
+    use crate::waku_store::message_queue::IndexedWakuMessage;
     use crate::waku_store::{compute_index, DEFAULT_PUBSUB_TOPIC};
     use futures::join;
     use futures::StreamExt;
@@ -315,7 +288,7 @@ mod tests {
         msg.set_payload(b"".to_vec());
         msg.set_content_topic("test_content_topic".to_string());
 
-        let indexed_message = IndexedWakuMessage { message: msg.clone(), index: compute_index(msg), pub_sub_topic: "test_pubsub_topic".to_string()};
+        let indexed_message = IndexedWakuMessage::new(msg.clone(), compute_index(msg), "test_pubsub_topic".to_string());
         swarm_a.behaviour_mut().message_queue.push(indexed_message).unwrap();
 
         let mut content_topics = Vec::new();
