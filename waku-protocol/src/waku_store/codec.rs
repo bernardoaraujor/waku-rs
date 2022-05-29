@@ -1,10 +1,10 @@
-use libp2p::core::upgrade::{read_length_prefixed, write_length_prefixed, ProtocolName};
-use libp2p::request_response::RequestResponseCodec;
 use crate::pb::waku_store_pb::HistoryRPC;
 use crate::waku_message::MAX_MESSAGE_SIZE;
 use async_trait::async_trait;
-use protobuf::Message;
 use futures::prelude::*;
+use libp2p::core::upgrade::{read_length_prefixed, write_length_prefixed, ProtocolName};
+use libp2p::request_response::RequestResponseCodec;
+use protobuf::Message;
 use std::io;
 
 const MAX_PAGE_SIZE: usize = 100; // Maximum number of waku messages in each page
@@ -29,8 +29,8 @@ impl RequestResponseCodec for WakuStoreCodec {
     type Response = HistoryRPC;
 
     async fn read_request<T>(&mut self, _: &Self::Protocol, io: &mut T) -> io::Result<Self::Request>
-        where
-            T: AsyncRead + Unpin + Send,
+    where
+        T: AsyncRead + Unpin + Send,
     {
         let rpc_bytes = read_length_prefixed(io, MAX_STORE_RPC_SIZE).await?;
         let rpc: HistoryRPC = protobuf::Message::parse_from_bytes(&rpc_bytes).unwrap();
@@ -42,8 +42,8 @@ impl RequestResponseCodec for WakuStoreCodec {
         _: &Self::Protocol,
         io: &mut T,
     ) -> io::Result<Self::Response>
-        where
-            T: AsyncRead + Unpin + Send,
+    where
+        T: AsyncRead + Unpin + Send,
     {
         let rpc_bytes = read_length_prefixed(io, MAX_STORE_RPC_SIZE).await?;
         let rpc: HistoryRPC = protobuf::Message::parse_from_bytes(&rpc_bytes).unwrap();
@@ -56,8 +56,8 @@ impl RequestResponseCodec for WakuStoreCodec {
         io: &mut T,
         query: Self::Request,
     ) -> io::Result<()>
-        where
-            T: AsyncWrite + Unpin + Send,
+    where
+        T: AsyncWrite + Unpin + Send,
     {
         let query_bytes = query.write_to_bytes()?;
         write_length_prefixed(io, query_bytes).await?;
@@ -70,8 +70,8 @@ impl RequestResponseCodec for WakuStoreCodec {
         io: &mut T,
         res: Self::Response,
     ) -> io::Result<()>
-        where
-            T: AsyncWrite + Unpin + Send,
+    where
+        T: AsyncWrite + Unpin + Send,
     {
         let res_bytes = res.write_to_bytes()?;
         write_length_prefixed(io, res_bytes).await?;

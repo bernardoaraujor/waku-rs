@@ -1,19 +1,21 @@
 use crate::pb::waku_message_pb::WakuMessage;
-use crate::pb::waku_store_pb::{ContentFilter, HistoryQuery, HistoryResponse, HistoryRPC, Index};
+use crate::pb::waku_store_pb::{ContentFilter, HistoryQuery, HistoryRPC, HistoryResponse, Index};
 use crate::waku_store::{
     codec::{WakuStoreCodec, WakuStoreProtocol},
-    message_queue::WakuMessageQueue
+    message_queue::WakuMessageQueue,
 };
 use libp2p::{
-    Multiaddr, NetworkBehaviour, PeerId, swarm::NetworkBehaviourEventProcess,
     request_response::{
-        ProtocolSupport, RequestResponse, RequestResponseConfig, RequestResponseEvent, RequestResponseMessage,
-    }
+        ProtocolSupport, RequestResponse, RequestResponseConfig, RequestResponseEvent,
+        RequestResponseMessage,
+    },
+    swarm::NetworkBehaviourEventProcess,
+    Multiaddr, NetworkBehaviour, PeerId,
 };
 use protobuf::RepeatedField;
 use sha2::{Digest, Sha256};
-use std::time::{SystemTime, UNIX_EPOCH};
 use std::iter::once;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 const DEFAULT_PUBSUB_TOPIC: &str = "/waku/2/default-waku/proto";
 
@@ -26,15 +28,15 @@ struct WakuStoreBehaviour {
 }
 
 impl NetworkBehaviourEventProcess<RequestResponseEvent<HistoryRPC, HistoryRPC>>
-for WakuStoreBehaviour
+    for WakuStoreBehaviour
 {
     fn inject_event(&mut self, event: RequestResponseEvent<HistoryRPC, HistoryRPC>) {
         if let RequestResponseEvent::Message {
             peer: _,
             message:
-            RequestResponseMessage::Request {
-                channel, request, ..
-            },
+                RequestResponseMessage::Request {
+                    channel, request, ..
+                },
         } = event
         {
             let request_id = request.get_request_id();
@@ -132,8 +134,8 @@ fn compute_index(msg: WakuMessage) -> Index {
 #[cfg(test)]
 mod tests {
     use crate::pb::waku_message_pb::WakuMessage;
-    use crate::waku_store::network_behaviour::WakuStoreBehaviour;
     use crate::waku_store::message_queue::IndexedWakuMessage;
+    use crate::waku_store::network_behaviour::WakuStoreBehaviour;
     use crate::waku_store::network_behaviour::{compute_index, DEFAULT_PUBSUB_TOPIC};
     use futures::join;
     use futures::StreamExt;
@@ -215,8 +217,12 @@ mod tests {
         msg.set_payload(b"".to_vec());
         msg.set_content_topic("test_content_topic".to_string());
 
-        let indexed_message = IndexedWakuMessage::new(msg.clone(), compute_index(msg), "test_pubsub_topic".to_string());
-        swarm_a.behaviour_mut().message_queue.push(indexed_message).unwrap();
+        let indexed_message = IndexedWakuMessage::new(
+            msg.clone(),
+            compute_index(msg),
+            "test_pubsub_topic".to_string(),
+        );
+        swarm_a.behaviour_mut().message_queue.push(indexed_message);
 
         let mut content_topics = Vec::new();
         content_topics.push("test_content_topic".to_string());

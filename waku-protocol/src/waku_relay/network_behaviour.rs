@@ -1,10 +1,12 @@
 use crate::pb::waku_message_pb::WakuMessage;
-use libp2p::{NetworkBehaviour, PeerId,
+use libp2p::{
     gossipsub::{
-    error::{PublishError, SubscriptionError},
-    Gossipsub, GossipsubConfigBuilder, GossipsubEvent, MessageAuthenticity,
-    MessageId, Sha256Topic, ValidationMode,
-}};
+        error::{PublishError, SubscriptionError},
+        Gossipsub, GossipsubConfigBuilder, GossipsubEvent, MessageAuthenticity, MessageId,
+        Sha256Topic, ValidationMode,
+    },
+    NetworkBehaviour, PeerId,
+};
 use protobuf::Message;
 
 const RELAY_PROTOCOL_ID: &str = "/vac/waku/relay/2.0.0";
@@ -34,9 +36,8 @@ impl WakuRelayBehaviour {
             .build()
             .expect("Valid config");
 
-        let gossipsub: Gossipsub =
-            Gossipsub::new(MessageAuthenticity::Anonymous, gossipsub_config)
-                .expect("Correct configuration");
+        let gossipsub: Gossipsub = Gossipsub::new(MessageAuthenticity::Anonymous, gossipsub_config)
+            .expect("Correct configuration");
 
         WakuRelayBehaviour { gossipsub }
     }

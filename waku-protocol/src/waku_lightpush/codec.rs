@@ -1,10 +1,11 @@
 use crate::pb::waku_lightpush_pb::PushRPC;
-use libp2p::{core::upgrade::{read_length_prefixed, write_length_prefixed, ProtocolName},
-             request_response::RequestResponseCodec
-};
 use crate::waku_message::MAX_MESSAGE_SIZE;
 use async_trait::async_trait;
 use futures::prelude::*;
+use libp2p::{
+    core::upgrade::{read_length_prefixed, write_length_prefixed, ProtocolName},
+    request_response::RequestResponseCodec,
+};
 use protobuf::Message;
 use std::io;
 
@@ -30,8 +31,8 @@ impl RequestResponseCodec for WakuLightPushCodec {
     type Response = PushRPC;
 
     async fn read_request<T>(&mut self, _: &Self::Protocol, io: &mut T) -> io::Result<Self::Request>
-        where
-            T: AsyncRead + Unpin + Send,
+    where
+        T: AsyncRead + Unpin + Send,
     {
         let rpc_bytes = read_length_prefixed(io, MAX_LIGHTPUSH_RPC_SIZE).await?;
         let rpc: PushRPC = protobuf::Message::parse_from_bytes(&rpc_bytes).unwrap();
@@ -43,8 +44,8 @@ impl RequestResponseCodec for WakuLightPushCodec {
         _: &Self::Protocol,
         io: &mut T,
     ) -> io::Result<Self::Response>
-        where
-            T: AsyncRead + Unpin + Send,
+    where
+        T: AsyncRead + Unpin + Send,
     {
         let rpc_bytes = read_length_prefixed(io, MAX_LIGHTPUSH_RPC_SIZE).await?;
         let rpc: PushRPC = protobuf::Message::parse_from_bytes(&rpc_bytes).unwrap();
@@ -57,8 +58,8 @@ impl RequestResponseCodec for WakuLightPushCodec {
         io: &mut T,
         req: Self::Request,
     ) -> io::Result<()>
-        where
-            T: AsyncWrite + Unpin + Send,
+    where
+        T: AsyncWrite + Unpin + Send,
     {
         let req_bytes = req.write_to_bytes()?;
         write_length_prefixed(io, req_bytes).await?;
@@ -71,8 +72,8 @@ impl RequestResponseCodec for WakuLightPushCodec {
         io: &mut T,
         res: Self::Response,
     ) -> io::Result<()>
-        where
-            T: AsyncWrite + Unpin + Send,
+    where
+        T: AsyncWrite + Unpin + Send,
     {
         let res_bytes = res.write_to_bytes()?;
         write_length_prefixed(io, res_bytes).await?;

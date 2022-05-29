@@ -1,17 +1,17 @@
-use libp2p::{
-    swarm::NetworkBehaviourEventProcess,
-    Multiaddr, NetworkBehaviour, PeerId,
-    request_response::{
-        ProtocolSupport, RequestResponse, RequestResponseConfig,
-        RequestResponseEvent, RequestResponseMessage,
-    }
-};
 use crate::pb::{
     waku_lightpush_pb::{PushRPC, PushRequest, PushResponse},
     waku_message_pb::WakuMessage,
 };
-use crate::waku_relay::network_behaviour::{WakuRelayBehaviour, WakuRelayEvent};
 use crate::waku_lightpush::codec::{WakuLightPushCodec, WakuLightPushProtocol};
+use crate::waku_relay::network_behaviour::{WakuRelayBehaviour, WakuRelayEvent};
+use libp2p::{
+    request_response::{
+        ProtocolSupport, RequestResponse, RequestResponseConfig, RequestResponseEvent,
+        RequestResponseMessage,
+    },
+    swarm::NetworkBehaviourEventProcess,
+    Multiaddr, NetworkBehaviour, PeerId,
+};
 use std::iter::once;
 
 #[derive(NetworkBehaviour)]
@@ -28,15 +28,15 @@ impl NetworkBehaviourEventProcess<WakuRelayEvent> for WakuLightPushBehaviour {
 }
 
 impl NetworkBehaviourEventProcess<RequestResponseEvent<PushRPC, PushRPC>>
-for WakuLightPushBehaviour
+    for WakuLightPushBehaviour
 {
     fn inject_event(&mut self, event: RequestResponseEvent<PushRPC, PushRPC>) {
         if let RequestResponseEvent::Message {
             peer,
             message:
-            RequestResponseMessage::Request {
-                channel, request, ..
-            },
+                RequestResponseMessage::Request {
+                    channel, request, ..
+                },
         } = event
         {
             // when WakuLightPushBehaviour receives a Request,
@@ -115,14 +115,12 @@ impl WakuLightPushBehaviour {
 
 #[cfg(test)]
 mod tests {
-    use crate::pb::{
-        waku_message_pb::WakuMessage,
-    };
+    use crate::pb::waku_message_pb::WakuMessage;
     use crate::waku_lightpush::network_behaviour::WakuLightPushBehaviour;
     use futures::join;
     use futures::StreamExt;
-    use libp2p::{identity::Keypair, Multiaddr, PeerId};
     use libp2p::swarm::Swarm;
+    use libp2p::{identity::Keypair, Multiaddr, PeerId};
     use std::str::FromStr;
 
     const ADDR_A: &str = "/ip4/127.0.0.1/tcp/58584";
