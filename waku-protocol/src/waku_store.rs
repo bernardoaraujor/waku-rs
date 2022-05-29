@@ -138,7 +138,20 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<HistoryRPC, HistoryRPC>>
                 },
         } = event
         {
-            // todo: parse query
+            let request_id = request.get_request_id();
+            let query = request.get_query();
+
+            // todo: search message queue and sort results
+
+            // todo: create an actual response
+            let response = HistoryResponse::new();
+
+            let mut res_rpc = HistoryRPC::new();
+            res_rpc.set_request_id(request_id.to_string());
+            res_rpc.set_query(query.clone());
+            res_rpc.set_response(response);
+
+            self.req_res.send_response(channel, res_rpc);
         } else if let RequestResponseEvent::Message {
             peer,
             message: RequestResponseMessage::Response { response, .. },
