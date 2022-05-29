@@ -1,9 +1,6 @@
 use libp2p::core::upgrade::{read_length_prefixed, write_length_prefixed, ProtocolName};
-use libp2p::request_response::{
-    ProtocolSupport, RequestResponse, RequestResponseCodec, RequestResponseConfig,
-    RequestResponseEvent, RequestResponseMessage,
-};
-use crate::pb::waku_store_pb::{HistoryRPC, HistoryResponse, HistoryQuery};
+use libp2p::request_response::RequestResponseCodec;
+use crate::pb::waku_store_pb::HistoryRPC;
 use crate::waku_message::MAX_MESSAGE_SIZE;
 use async_trait::async_trait;
 use protobuf::Message;

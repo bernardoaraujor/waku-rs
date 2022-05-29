@@ -1,12 +1,7 @@
-use crate::pb::{
-    waku_lightpush_pb::{PushRPC, PushRequest, PushResponse},
-    waku_message_pb::WakuMessage,
-};
+use crate::pb::waku_lightpush_pb::PushRPC;
 use libp2p::{core::upgrade::{read_length_prefixed, write_length_prefixed, ProtocolName},
-             request_response::{
-                 ProtocolSupport, RequestResponse, RequestResponseCodec, RequestResponseConfig,
-                 RequestResponseEvent, RequestResponseMessage,
-             }};
+             request_response::RequestResponseCodec
+};
 use crate::waku_message::MAX_MESSAGE_SIZE;
 use async_trait::async_trait;
 use futures::prelude::*;

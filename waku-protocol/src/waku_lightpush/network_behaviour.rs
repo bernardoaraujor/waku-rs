@@ -1,10 +1,8 @@
 use libp2p::{
-    core::upgrade::{read_length_prefixed, write_length_prefixed, ProtocolName},
-    identity::Keypair,
     swarm::NetworkBehaviourEventProcess,
-    Multiaddr, NetworkBehaviour, PeerId, Swarm,
+    Multiaddr, NetworkBehaviour, PeerId,
     request_response::{
-        ProtocolSupport, RequestResponse, RequestResponseCodec, RequestResponseConfig,
+        ProtocolSupport, RequestResponse, RequestResponseConfig,
         RequestResponseEvent, RequestResponseMessage,
     }
 };
@@ -82,9 +80,9 @@ for WakuLightPushBehaviour
 }
 
 impl WakuLightPushBehaviour {
-    pub fn new(key: Keypair) -> Self {
+    pub fn new() -> Self {
         Self {
-            relay: WakuRelayBehaviour::new(key),
+            relay: WakuRelayBehaviour::new(),
             req_res: RequestResponse::new(
                 WakuLightPushCodec,
                 once((WakuLightPushProtocol(), ProtocolSupport::Full)),
@@ -155,12 +153,12 @@ mod tests {
         let peer_id_b = PeerId::from_str(PEER_ID_B).unwrap();
 
         let transport_a = libp2p::development_transport(key_a.clone()).await?;
-        let waku_lp_behaviour_a = WakuLightPushBehaviour::new(key_a.clone());
+        let waku_lp_behaviour_a = WakuLightPushBehaviour::new();
         let mut swarm_a = Swarm::new(transport_a, waku_lp_behaviour_a, peer_id_a);
         swarm_a.listen_on(address_a).unwrap();
 
         let transport_b = libp2p::development_transport(key_b.clone()).await?;
-        let waku_lp_behaviour_b = WakuLightPushBehaviour::new(key_b.clone());
+        let waku_lp_behaviour_b = WakuLightPushBehaviour::new();
         let mut swarm_b = Swarm::new(transport_b, waku_lp_behaviour_b, peer_id_b);
         swarm_b.listen_on(address_b.clone()).unwrap();
 

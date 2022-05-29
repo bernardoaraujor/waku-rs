@@ -1,10 +1,10 @@
 use crate::pb::waku_message_pb::WakuMessage;
-use libp2p::gossipsub::error::{PublishError, SubscriptionError};
-use libp2p::gossipsub::{
-    Gossipsub, GossipsubEvent, MessageAuthenticity,
+use libp2p::{NetworkBehaviour, PeerId,
+    gossipsub::{
+    error::{PublishError, SubscriptionError},
+    Gossipsub, GossipsubConfigBuilder, GossipsubEvent, MessageAuthenticity,
     MessageId, Sha256Topic, ValidationMode,
-};
-use libp2p::{gossipsub, identity::Keypair, NetworkBehaviour, PeerId};
+}};
 use protobuf::Message;
 
 const RELAY_PROTOCOL_ID: &str = "/vac/waku/relay/2.0.0";
@@ -27,15 +27,15 @@ impl From<GossipsubEvent> for WakuRelayEvent {
 }
 
 impl WakuRelayBehaviour {
-    pub fn new(key: Keypair) -> Self {
-        let gossipsub_config = gossipsub::GossipsubConfigBuilder::default()
+    pub fn new() -> Self {
+        let gossipsub_config = GossipsubConfigBuilder::default()
             .protocol_id_prefix(RELAY_PROTOCOL_ID)
             .validation_mode(ValidationMode::Anonymous) // StrictNoSign
             .build()
             .expect("Valid config");
 
-        let mut gossipsub: gossipsub::Gossipsub =
-            gossipsub::Gossipsub::new(MessageAuthenticity::Anonymous, gossipsub_config)
+        let gossipsub: Gossipsub =
+            Gossipsub::new(MessageAuthenticity::Anonymous, gossipsub_config)
                 .expect("Correct configuration");
 
         WakuRelayBehaviour { gossipsub }
@@ -50,7 +50,7 @@ impl WakuRelayBehaviour {
         let sha256topic = Sha256Topic::new(topic);
         let msg_bytes = match msg.write_to_bytes() {
             Ok(b) => b,
-            Err(e) => panic!("can't write WakuMessage bytes"), // todo: proper error propagation
+            Err(_) => panic!("can't write WakuMessage bytes"), // todo: proper error propagation
         };
         self.gossipsub.publish(sha256topic, msg_bytes)
     }
@@ -92,8 +92,8 @@ mod tests {
         let peer_id_b = PeerId::from_str(PEER_ID_B).unwrap();
         let transport_b = libp2p::development_transport(key_b.clone()).await?;
 
-        let mut waku_relay_behaviour_a = WakuRelayBehaviour::new(key_a);
-        let mut waku_relay_behaviour_b = WakuRelayBehaviour::new(key_b);
+        let mut waku_relay_behaviour_a = WakuRelayBehaviour::new();
+        let mut waku_relay_behaviour_b = WakuRelayBehaviour::new();
 
         let topic = "test-topic";
 
@@ -109,11 +109,11 @@ mod tests {
         swarm_a.listen_on(address_a.clone()).unwrap();
         swarm_b.listen_on(address_b.clone()).unwrap();
 
-        swarm_a.dial(address_b);
+        swarm_a.dial(address_b).unwrap();
 
         loop {
             let msg = WakuMessage::new();
-            swarm_a.behaviour_mut().publish(topic.clone(), msg);
+            swarm_a.behaviour_mut().publish(topic.clone(), msg).unwrap();
             select! { event = swarm_a.select_next_some() => {
                 println!("a {:?}", event);
             }, event = swarm_b.select_next_some() => {

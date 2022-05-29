@@ -1,19 +1,19 @@
 use crate::pb::waku_message_pb::WakuMessage;
 use crate::pb::waku_store_pb::{ContentFilter, HistoryQuery, HistoryResponse, HistoryRPC, Index};
-use crate::waku_store::codec::{WakuStoreCodec, WakuStoreProtocol};
-use crate::waku_store::message_queue::WakuMessageQueue;
-use futures::prelude::*;
-use libp2p::request_response::{
-    ProtocolSupport, RequestResponse, RequestResponseCodec, RequestResponseConfig,
-    RequestResponseEvent, RequestResponseMessage,
+use crate::waku_store::{
+    codec::{WakuStoreCodec, WakuStoreProtocol},
+    message_queue::WakuMessageQueue
 };
-use libp2p::swarm::NetworkBehaviourEventProcess;
-use libp2p::{Multiaddr, NetworkBehaviour, PeerId};
-use protobuf::{Message, RepeatedField};
+use libp2p::{
+    Multiaddr, NetworkBehaviour, PeerId, swarm::NetworkBehaviourEventProcess,
+    request_response::{
+        ProtocolSupport, RequestResponse, RequestResponseConfig, RequestResponseEvent, RequestResponseMessage,
+    }
+};
+use protobuf::RepeatedField;
 use sha2::{Digest, Sha256};
 use std::time::{SystemTime, UNIX_EPOCH};
-use std::{io, iter::once};
-
+use std::iter::once;
 
 const DEFAULT_PUBSUB_TOPIC: &str = "/waku/2/default-waku/proto";
 
@@ -30,7 +30,7 @@ for WakuStoreBehaviour
 {
     fn inject_event(&mut self, event: RequestResponseEvent<HistoryRPC, HistoryRPC>) {
         if let RequestResponseEvent::Message {
-            peer,
+            peer: _,
             message:
             RequestResponseMessage::Request {
                 channel, request, ..
@@ -52,7 +52,7 @@ for WakuStoreBehaviour
 
             self.req_res.send_response(channel, res_rpc);
         } else if let RequestResponseEvent::Message {
-            peer,
+            peer: _,
             message: RequestResponseMessage::Response { response, .. },
         } = event
         {
