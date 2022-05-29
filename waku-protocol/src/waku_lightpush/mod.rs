@@ -3,7 +3,7 @@ use crate::pb::{
     waku_message_pb::WakuMessage,
 };
 use crate::waku_message::MAX_MESSAGE_SIZE;
-use crate::waku_relay::{WakuRelayBehaviour, WakuRelayEvent};
+use crate::waku_relay::network_behaviour::{WakuRelayBehaviour, WakuRelayEvent};
 use async_trait::async_trait;
 use futures::prelude::*;
 use libp2p::{
