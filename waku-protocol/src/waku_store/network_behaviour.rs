@@ -109,7 +109,7 @@ impl WakuStoreBehaviour {
 }
 
 // Takes a WakuMessage and returns its Index.
-fn compute_index(msg: WakuMessage) -> Index {
+pub fn compute_index(msg: WakuMessage) -> Index {
     let mut hasher = Sha256::new();
 
     hasher.update(msg.payload);
