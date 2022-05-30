@@ -224,7 +224,11 @@ mod tests {
             compute_index(msg),
             "test_pubsub_topic".to_string(),
         );
-        swarm_a.behaviour_mut().message_queue.push(indexed_message);
+        swarm_a
+            .behaviour_mut()
+            .message_queue
+            .push(indexed_message)
+            .unwrap();
 
         let mut content_topics = Vec::new();
         content_topics.push("test_content_topic".to_string());
