@@ -17,6 +17,22 @@ impl IndexedWakuMessage {
             pubsub_topic,
         }
     }
+
+    pub fn index(&self) -> &Index {
+        &self.index
+    }
+
+    pub fn pubsub_topic(&self) -> &String {
+        &self.pubsub_topic
+    }
+
+    pub fn content_topic(&self) -> &str {
+        &self.message.get_content_topic()
+    }
+
+    pub fn message(&self) -> &WakuMessage {
+        &self.message
+    }
 }
 
 pub struct WakuMessageQueue {
@@ -89,6 +105,10 @@ impl WakuMessageQueue {
 
     pub fn back(&self) -> Option<&IndexedWakuMessage> {
         self.messages.back()
+    }
+
+    pub fn get(&self, i: usize) -> Option<&IndexedWakuMessage> {
+        self.messages.get(i)
     }
 
     pub fn has_queued_digest(&self, digest: Vec<u8>) -> bool {

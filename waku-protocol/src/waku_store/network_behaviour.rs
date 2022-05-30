@@ -1,5 +1,8 @@
 use crate::pb::waku_message_pb::WakuMessage;
-use crate::pb::waku_store_pb::{ContentFilter, HistoryQuery, HistoryRPC, HistoryResponse, Index};
+use crate::pb::waku_store_pb::{
+    ContentFilter, HistoryQuery, HistoryRPC, HistoryResponse, HistoryResponse_Error, Index,
+    PagingInfo_Direction,
+};
 use crate::waku_store::{
     codec::{WakuStoreCodec, WakuStoreProtocol},
     message_queue::WakuMessageQueue,
@@ -41,19 +44,53 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<HistoryRPC, HistoryRPC>>
         {
             let request_id = request.get_request_id();
             let query = request.get_query();
+            let query_pubsub_topic = query.get_pubsub_topic();
+            let query_content_filters = query.get_content_filters();
+            let query_paging_info = query.get_paging_info();
+            let query_page_size = query_paging_info.get_page_size();
+            let query_direction = query_paging_info.get_direction();
+            let query_cursor = query.get_paging_info().get_cursor();
+            let query_digest = query_cursor.get_digest().to_vec();
 
-            // todo: treat case queried message is not on store
-            if !self
-                .message_queue
-                .has_queued_digest(query.get_paging_info().get_cursor().get_digest().to_vec())
-            {
-                todo!()
+            let mut response = HistoryResponse::new();
+
+            if !self.message_queue.has_queued_digest(query_digest) {
+                response.set_error(HistoryResponse_Error::NONE);
+            } else {
+                let mut res_messages = Vec::new();
+                let mut j = 0;
+                for (i, indexed_message) in self.message_queue.iter().enumerate() {
+                    if indexed_message.index() == query_cursor {
+                        j = i;
+                    }
+                }
+
+                let mut page_count = 0;
+                let dir: i32 = match query_direction {
+                    PagingInfo_Direction::FORWARD => 1,
+                    PagingInfo_Direction::BACKWARD => -1,
+                };
+                for k in 0..self.message_queue.len() {
+                    let i = (j as i32 + k as i32 * dir) % self.message_queue.len() as i32;
+                    if let Some(indexed_message) = self.message_queue.get(i as usize) {
+                        let mut cf = ContentFilter::new();
+                        cf.set_contentTopic(indexed_message.content_topic().to_string());
+                        if indexed_message.pubsub_topic() == query_pubsub_topic
+                            && query_content_filters.contains(&cf)
+                        {
+                            res_messages.push(indexed_message.message().clone());
+                            page_count = page_count + 1;
+
+                            if page_count == query_page_size {
+                                break;
+                            }
+                        }
+                    };
+                }
+
+                response.set_messages(RepeatedField::from_vec(res_messages));
             }
-
-            // todo: search message queue and sort results
-
-            // todo: create an actual response
-            let response = HistoryResponse::new();
+            response.set_paging_info(query_paging_info.clone());
 
             let mut res_rpc = HistoryRPC::new();
             res_rpc.set_request_id(request_id.to_string());
