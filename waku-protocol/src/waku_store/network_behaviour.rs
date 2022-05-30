@@ -42,6 +42,14 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<HistoryRPC, HistoryRPC>>
             let request_id = request.get_request_id();
             let query = request.get_query();
 
+            // todo: treat case queried message is not on store
+            if !self
+                .message_queue
+                .has_queued_digest(query.get_paging_info().get_cursor().get_digest().to_vec())
+            {
+                todo!()
+            }
+
             // todo: search message queue and sort results
 
             // todo: create an actual response
