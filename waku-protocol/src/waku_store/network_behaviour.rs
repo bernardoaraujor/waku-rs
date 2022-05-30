@@ -60,7 +60,7 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<HistoryRPC, HistoryRPC>>
             res_rpc.set_query(query.clone());
             res_rpc.set_response(response);
 
-            self.req_res.send_response(channel, res_rpc);
+            self.req_res.send_response(channel, res_rpc).unwrap();
         } else if let RequestResponseEvent::Message {
             peer: _,
             message: RequestResponseMessage::Response { response, .. },

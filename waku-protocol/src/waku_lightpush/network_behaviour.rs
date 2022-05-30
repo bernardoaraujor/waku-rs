@@ -64,7 +64,7 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<PushRPC, PushRPC>>
             res_rpc.set_response(res);
             res_rpc.set_request_id(req_id.to_string());
 
-            self.req_res.send_response(channel, res_rpc);
+            self.req_res.send_response(channel, res_rpc).unwrap();
         } else if let RequestResponseEvent::Message {
             peer,
             message: RequestResponseMessage::Response { response, .. },
