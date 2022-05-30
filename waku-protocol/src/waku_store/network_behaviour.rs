@@ -108,6 +108,8 @@ impl WakuStoreBehaviour {
     }
 }
 
+pub type WakuMessageDigest = Vec<u8>;
+
 // Takes a WakuMessage and returns its Index.
 pub fn compute_index(msg: WakuMessage) -> Index {
     let mut hasher = Sha256::new();
@@ -115,7 +117,7 @@ pub fn compute_index(msg: WakuMessage) -> Index {
     hasher.update(msg.payload);
     hasher.update(msg.content_topic.as_bytes());
 
-    let digest = hasher.finalize().as_slice().to_vec();
+    let digest: WakuMessageDigest = hasher.finalize().as_slice().to_vec();
 
     let mut index = Index::new();
     index.set_digest(digest);
