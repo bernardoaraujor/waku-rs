@@ -121,7 +121,5 @@ mod tests {
                 println!("b {:?}", event);
             }};
         }
-
-        Ok(())
     }
 }
