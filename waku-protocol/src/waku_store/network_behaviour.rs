@@ -93,8 +93,6 @@ impl WakuStoreBehaviour {
         request_id: String,
         pubsub_topic: String,
         content_topic: Vec<String>,
-        start_time: i64,
-        end_time: i64,
     ) {
         let mut query = HistoryQuery::new();
         query.set_pubsub_topic(pubsub_topic);
@@ -105,8 +103,6 @@ impl WakuStoreBehaviour {
             content_filters.push(c);
         }
         query.set_content_filters(content_filters);
-        query.set_start_time(start_time);
-        query.set_end_time(end_time);
 
         let mut query_rpc = HistoryRPC::new();
         query_rpc.set_request_id(request_id);
@@ -245,8 +241,6 @@ mod tests {
             "test_request_id".to_string(),
             "test_pubsub_topic".to_string(),
             content_topics,
-            0,
-            10,
         );
 
         let future_a = start(swarm_a);
