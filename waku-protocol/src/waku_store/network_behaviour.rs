@@ -32,6 +32,29 @@ struct WakuStoreBehaviour {
     #[behaviour(ignore)]
     message_queue: WakuMessageQueue,
     req_res: RequestResponse<WakuStoreCodec>,
+    relay: WakuRelayBehaviour, // todo: Either filter
+}
+
+impl NetworkBehaviourEventProcess<WakuRelayEvent> for WakuStoreBehaviour {
+    fn inject_event(&mut self, event: WakuRelayEvent) {
+        if let WakuRelayEvent::GossipSub(GossipsubEvent::Message {
+            propagation_source: peer_id,
+            message_id: id,
+            message,
+        }) = event
+        {
+            let topic = message.topic.to_string();
+            let mut waku_message = WakuMessage::new();
+            waku_message.merge_from_bytes(&message.data).unwrap();
+            let indexed_message =
+                IndexedWakuMessage::new(waku_message.clone(), compute_index(waku_message), topic);
+            info!(
+                "WakuStore: queueing message received via WakuRelay: {:?}",
+                indexed_message
+            );
+            self.message_queue.push(indexed_message).unwrap();
+        }
+    }
 }
 
 impl NetworkBehaviourEventProcess<RequestResponseEvent<HistoryRPC, HistoryRPC>>
@@ -129,6 +152,7 @@ impl WakuStoreBehaviour {
                 once((WakuStoreProtocol(), ProtocolSupport::Full)),
                 RequestResponseConfig::default(),
             ),
+            relay: WakuRelayBehaviour::new(),
         }
     }
 
