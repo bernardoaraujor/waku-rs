@@ -44,10 +44,7 @@ pub struct WakuMessageQueue {
 #[derive(Debug, Clone, PartialEq)]
 pub enum WakuMessageQueueErrors {
     Duplicated,
-    FutureMessage,
 }
-
-const MAX_TIME_VARIANCE: i64 = 20;
 
 impl WakuMessageQueue {
     pub fn new(max_messages: usize) -> Self {

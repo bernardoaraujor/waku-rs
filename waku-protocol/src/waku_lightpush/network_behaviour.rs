@@ -32,7 +32,7 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<PushRPC, PushRPC>>
 {
     fn inject_event(&mut self, event: RequestResponseEvent<PushRPC, PushRPC>) {
         if let RequestResponseEvent::Message {
-            peer,
+            peer: _,
             message:
                 RequestResponseMessage::Request {
                     channel, request, ..
@@ -66,7 +66,7 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<PushRPC, PushRPC>>
 
             self.req_res.send_response(channel, res_rpc).unwrap();
         } else if let RequestResponseEvent::Message {
-            peer,
+            peer: _,
             message: RequestResponseMessage::Response { response, .. },
         } = event
         {

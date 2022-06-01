@@ -38,8 +38,8 @@ struct WakuStoreBehaviour {
 impl NetworkBehaviourEventProcess<WakuRelayEvent> for WakuStoreBehaviour {
     fn inject_event(&mut self, event: WakuRelayEvent) {
         if let WakuRelayEvent::GossipSub(GossipsubEvent::Message {
-            propagation_source: peer_id,
-            message_id: id,
+            propagation_source: _,
+            message_id: _,
             message,
         }) = event
         {
@@ -227,7 +227,6 @@ pub fn compute_index(msg: WakuMessage) -> Index {
 #[cfg(test)]
 mod tests {
     use crate::pb::waku_message_pb::WakuMessage;
-    use crate::pb::waku_store_pb::Index;
     use crate::waku_store::message_queue::IndexedWakuMessage;
     use crate::waku_store::network_behaviour::WakuStoreBehaviour;
     use crate::waku_store::network_behaviour::{compute_index, DEFAULT_PUBSUB_TOPIC};
