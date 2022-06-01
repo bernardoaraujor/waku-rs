@@ -1,9 +1,10 @@
 use crate::pb::waku_message_pb::WakuMessage;
+use libp2p::gossipsub::IdentTopic;
 use libp2p::{
     gossipsub::{
         error::{PublishError, SubscriptionError},
         Gossipsub, GossipsubConfigBuilder, GossipsubEvent, MessageAuthenticity, MessageId,
-        Sha256Topic, ValidationMode,
+        ValidationMode,
     },
     NetworkBehaviour, PeerId,
 };
@@ -43,17 +44,17 @@ impl WakuRelayBehaviour {
     }
 
     fn subscribe(&mut self, topic: &str) -> Result<bool, SubscriptionError> {
-        let sha256topic = Sha256Topic::new(topic);
-        self.gossipsub.subscribe(&sha256topic)
+        let ident_topic = IdentTopic::new(topic);
+        self.gossipsub.subscribe(&ident_topic)
     }
 
     pub fn publish(&mut self, topic: &str, msg: WakuMessage) -> Result<MessageId, PublishError> {
-        let sha256topic = Sha256Topic::new(topic);
+        let ident_topic = IdentTopic::new(topic);
         let msg_bytes = match msg.write_to_bytes() {
             Ok(b) => b,
             Err(_) => panic!("can't write WakuMessage bytes"), // todo: proper error propagation
         };
-        self.gossipsub.publish(sha256topic, msg_bytes)
+        self.gossipsub.publish(ident_topic, msg_bytes)
     }
 
     fn add_peer(&mut self, peer_id: &PeerId) {
