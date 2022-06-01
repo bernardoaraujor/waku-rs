@@ -1,13 +1,16 @@
 use crate::pb::waku_message_pb::WakuMessage;
 use crate::pb::waku_store_pb::{
     ContentFilter, HistoryQuery, HistoryRPC, HistoryResponse, HistoryResponse_Error, Index,
-    PagingInfo_Direction,
+    PagingInfo, PagingInfo_Direction,
 };
+use crate::waku_relay::network_behaviour::{WakuRelayBehaviour, WakuRelayEvent};
+use crate::waku_store::message_queue::IndexedWakuMessage;
 use crate::waku_store::{
     codec::{WakuStoreCodec, WakuStoreProtocol},
     message_queue::WakuMessageQueue,
 };
 use libp2p::{
+    gossipsub::GossipsubEvent,
     request_response::{
         ProtocolSupport, RequestResponse, RequestResponseConfig, RequestResponseEvent,
         RequestResponseMessage,
@@ -15,7 +18,8 @@ use libp2p::{
     swarm::NetworkBehaviourEventProcess,
     Multiaddr, NetworkBehaviour, PeerId,
 };
-use protobuf::RepeatedField;
+use log::info;
+use protobuf::{Message, RepeatedField};
 use sha2::{Digest, Sha256};
 use std::iter::once;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -44,6 +48,11 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<HistoryRPC, HistoryRPC>>
         {
             let request_id = request.get_request_id();
             let query = request.get_query();
+            info!(
+                "WakuStore: received request. Request ID: {}, Query: {:?}",
+                request_id, query
+            );
+
             let query_pubsub_topic = query.get_pubsub_topic();
             let query_content_filters = query.get_content_filters();
             let query_paging_info = query.get_paging_info();
@@ -55,6 +64,7 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<HistoryRPC, HistoryRPC>>
             let mut response = HistoryResponse::new();
 
             if !self.message_queue.has_queued_digest(query_digest) {
+                info!("WakuStore: query not found");
                 response.set_error(HistoryResponse_Error::NONE);
             } else {
                 let mut res_messages = Vec::new();
@@ -95,14 +105,16 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<HistoryRPC, HistoryRPC>>
             let mut res_rpc = HistoryRPC::new();
             res_rpc.set_request_id(request_id.to_string());
             res_rpc.set_query(query.clone());
-            res_rpc.set_response(response);
+            res_rpc.set_response(response.clone());
 
+            info!("WakuStore: sending query response: {:?}", response);
             self.req_res.send_response(channel, res_rpc).unwrap();
         } else if let RequestResponseEvent::Message {
             peer: _,
             message: RequestResponseMessage::Response { response, .. },
         } = event
         {
+            info!("WakuStore: received response. {:?}", response);
             //todo: parse response
         }
     }
@@ -127,12 +139,25 @@ impl WakuStoreBehaviour {
     pub fn send_query(
         &mut self,
         peer_id: PeerId,
-        request_id: String,
+        request_id: String, // todo: should this be an input parameter?
+        cursor: Index,
+        page_size: u64,
+        direction: bool,
         pubsub_topic: String,
         content_topic: Vec<String>,
     ) {
         let mut query = HistoryQuery::new();
         query.set_pubsub_topic(pubsub_topic);
+
+        let mut paging_info = PagingInfo::new();
+        paging_info.set_page_size(page_size);
+        paging_info.set_cursor(cursor);
+        match direction {
+            true => paging_info.set_direction(PagingInfo_Direction::FORWARD),
+            false => paging_info.set_direction(PagingInfo_Direction::BACKWARD),
+        }
+        query.set_paging_info(paging_info);
+
         let mut content_filters = RepeatedField::new();
         for t in content_topic {
             let mut c = ContentFilter::new();
@@ -140,6 +165,7 @@ impl WakuStoreBehaviour {
             content_filters.push(c);
         }
         query.set_content_filters(content_filters);
+        info!("WakuStore: sending query: {:?}", query);
 
         let mut query_rpc = HistoryRPC::new();
         query_rpc.set_request_id(request_id);
@@ -177,6 +203,7 @@ pub fn compute_index(msg: WakuMessage) -> Index {
 #[cfg(test)]
 mod tests {
     use crate::pb::waku_message_pb::WakuMessage;
+    use crate::pb::waku_store_pb::Index;
     use crate::waku_store::message_queue::IndexedWakuMessage;
     use crate::waku_store::network_behaviour::WakuStoreBehaviour;
     use crate::waku_store::network_behaviour::{compute_index, DEFAULT_PUBSUB_TOPIC};
@@ -234,6 +261,9 @@ mod tests {
 
     #[async_std::test]
     async fn my_test() -> std::io::Result<()> {
+        env_logger::init_from_env(
+            env_logger::Env::default().filter_or(env_logger::DEFAULT_FILTER_ENV, "info"),
+        );
         let decoded_key_a = bs58::decode(&KEY_A.to_string()).into_vec().unwrap();
         let key_a = Keypair::from_protobuf_encoding(&decoded_key_a).unwrap();
         let address_a = Multiaddr::from_str(&ADDR_A.to_string()).unwrap();
@@ -257,25 +287,30 @@ mod tests {
         swarm_a.behaviour_mut().add_store_peer(peer_id_b, address_b);
 
         let mut msg = WakuMessage::new();
-        msg.set_payload(b"".to_vec());
+        msg.set_payload(b"test_payload".to_vec());
         msg.set_content_topic("test_content_topic".to_string());
 
         let indexed_message = IndexedWakuMessage::new(
             msg.clone(),
-            compute_index(msg),
+            compute_index(msg.clone()),
             "test_pubsub_topic".to_string(),
         );
-        swarm_a
+        swarm_b
             .behaviour_mut()
             .message_queue
             .push(indexed_message)
             .unwrap();
+
+        let cursor = compute_index(msg);
 
         let mut content_topics = Vec::new();
         content_topics.push("test_content_topic".to_string());
         swarm_a.behaviour_mut().send_query(
             peer_id_b,
             "test_request_id".to_string(),
+            cursor,
+            1,
+            true,
             "test_pubsub_topic".to_string(),
             content_topics,
         );
