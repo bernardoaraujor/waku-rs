@@ -110,11 +110,17 @@ mod tests {
         swarm_a.listen_on(address_a.clone()).unwrap();
         swarm_b.listen_on(address_b.clone()).unwrap();
 
-        swarm_a.dial(address_b).unwrap();
+        match swarm_a.dial(address_b.clone()) {
+            Ok(_) => println!("Dialed {:?}", address_b),
+            Err(e) => println!("Dial {:?} failed: {:?}", address_b, e),
+        }
 
         loop {
             let msg = WakuMessage::new();
-            swarm_a.behaviour_mut().publish(topic.clone(), msg).unwrap();
+            match swarm_a.behaviour_mut().publish(topic.clone(), msg) {
+                Ok(m) => println!("{}", m),
+                Err(e) => println!("{}", e),
+            }
             select! { event = swarm_a.select_next_some() => {
                 println!("a {:?}", event);
             }, event = swarm_b.select_next_some() => {
