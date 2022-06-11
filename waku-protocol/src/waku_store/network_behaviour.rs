@@ -270,12 +270,6 @@ mod tests {
     const ADDR_A: &str = "/ip4/127.0.0.1/tcp/58584";
     const ADDR_B: &str = "/ip4/127.0.0.1/tcp/58601";
 
-    const KEY_A: &str = "23jhTbXRXh1RPMwzN2B7GNXZDiDtrkdm943bVBfAQBJFUosggfSDVQzui7pEbuzBFf6x7C5SLWXvUGB1gPaTLTpwRxDYu";
-    const KEY_B: &str = "23jhTfVepCSFrkYE8tATMUuxU3SErCYvrShcit6dQfaonM4QxF82wh4k917LJShErtKNNbaUjmqGVDLDQdVB9n7TGieQ1";
-
-    const PEER_ID_A: &str = "12D3KooWLyTCx9j2FMcsHe81RMoDfhXbdyyFgNGQMdcrnhShTvQh";
-    const PEER_ID_B: &str = "12D3KooWKBKXsLwbmVBySEmbKayJzfWp3tPCKrnDCsmNy9prwjvy";
-
     async fn start(mut swarm: Swarm<WakuStoreBehaviour>) {
         loop {
             swarm.select_next_some().await;
@@ -287,15 +281,13 @@ mod tests {
         env_logger::init_from_env(
             env_logger::Env::default().filter_or(env_logger::DEFAULT_FILTER_ENV, "info"),
         );
-        let decoded_key_a = bs58::decode(&KEY_A.to_string()).into_vec().unwrap();
-        let key_a = Keypair::from_protobuf_encoding(&decoded_key_a).unwrap();
+        let key_a = Keypair::generate_ed25519();
+        let peer_id_a = PeerId::from(key_a.public());
         let address_a = Multiaddr::from_str(&ADDR_A.to_string()).unwrap();
-        let peer_id_a = PeerId::from_str(PEER_ID_A).unwrap();
 
-        let decoded_key_b = bs58::decode(&KEY_B.to_string()).into_vec().unwrap();
-        let key_b = Keypair::from_protobuf_encoding(&decoded_key_b).unwrap();
+        let key_b = Keypair::generate_ed25519();
+        let peer_id_b = PeerId::from(key_b.public());
         let address_b = Multiaddr::from_str(&ADDR_B.to_string()).unwrap();
-        let peer_id_b = PeerId::from_str(PEER_ID_B).unwrap();
 
         let transport_a = libp2p::development_transport(key_a.clone()).await?;
         let waku_lp_behaviour_a = WakuStoreBehaviour::new(10);
