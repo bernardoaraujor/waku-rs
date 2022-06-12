@@ -43,7 +43,7 @@ impl WakuRelayBehaviour {
         WakuRelayBehaviour { gossipsub }
     }
 
-    fn subscribe(&mut self, topic: &str) -> Result<bool, SubscriptionError> {
+    pub fn subscribe(&mut self, topic: &str) -> Result<bool, SubscriptionError> {
         let ident_topic = IdentTopic::new(topic);
         self.gossipsub.subscribe(&ident_topic)
     }
@@ -57,7 +57,7 @@ impl WakuRelayBehaviour {
         self.gossipsub.publish(ident_topic, msg_bytes)
     }
 
-    fn add_peer(&mut self, peer_id: &PeerId) {
+    pub fn add_peer(&mut self, peer_id: &PeerId) {
         self.gossipsub.add_explicit_peer(peer_id);
     }
 }

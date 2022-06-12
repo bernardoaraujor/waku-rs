@@ -10,7 +10,7 @@ use crate::waku_store::{
     message_queue::WakuMessageQueue,
 };
 use libp2p::{
-    gossipsub::GossipsubEvent,
+    gossipsub::{error::SubscriptionError, GossipsubEvent},
     request_response::{
         ProtocolSupport, RequestResponse, RequestResponseConfig, RequestResponseEvent,
         RequestResponseMessage,
@@ -46,8 +46,11 @@ impl NetworkBehaviourEventProcess<WakuRelayEvent> for WakuStoreBehaviour {
             let topic = message.topic.to_string();
             let mut waku_message = WakuMessage::new();
             waku_message.merge_from_bytes(&message.data).unwrap();
-            let indexed_message =
-                IndexedWakuMessage::new(waku_message.clone(), compute_index(waku_message), topic);
+            let indexed_message = IndexedWakuMessage::new(
+                waku_message.clone(),
+                compute_index(waku_message.clone()),
+                topic.clone(),
+            );
             info!(
                 "WakuStore: queueing message received via WakuRelay: {:?}",
                 indexed_message
@@ -160,6 +163,14 @@ impl WakuStoreBehaviour {
         self.req_res.add_address(&peer_id, peer_addr);
     }
 
+    pub fn add_relay_peer(&mut self, peer_id: &PeerId) {
+        self.relay.add_peer(peer_id);
+    }
+
+    fn subscribe(&mut self, topic: &str) -> Result<bool, SubscriptionError> {
+        self.relay.subscribe(topic)
+    }
+
     pub fn send_query(
         &mut self,
         peer_id: PeerId,
@@ -227,12 +238,15 @@ pub fn compute_index(msg: WakuMessage) -> Index {
 #[cfg(test)]
 mod tests {
     use crate::pb::waku_message_pb::WakuMessage;
+    use crate::waku_relay::network_behaviour::WakuRelayBehaviour;
     use crate::waku_store::message_queue::IndexedWakuMessage;
     use crate::waku_store::network_behaviour::WakuStoreBehaviour;
     use crate::waku_store::network_behaviour::{compute_index, DEFAULT_PUBSUB_TOPIC};
-    use futures::join;
     use futures::StreamExt;
+    use futures::{join, select};
+    use libp2p::swarm::NetworkBehaviour;
     use libp2p::{identity::Keypair, swarm::Swarm, Multiaddr, PeerId};
+    use log::info;
     use sha2::{Digest, Sha256};
     use std::str::FromStr;
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -269,15 +283,16 @@ mod tests {
 
     const ADDR_A: &str = "/ip4/127.0.0.1/tcp/58584";
     const ADDR_B: &str = "/ip4/127.0.0.1/tcp/58601";
+    const ADDR_C: &str = "/ip4/127.0.0.1/tcp/58748";
 
-    async fn start(mut swarm: Swarm<WakuStoreBehaviour>) {
+    async fn start<T: NetworkBehaviour>(mut swarm: Swarm<T>) {
         loop {
             swarm.select_next_some().await;
         }
     }
 
     #[async_std::test]
-    async fn my_test() -> std::io::Result<()> {
+    async fn test_2_stores() -> std::io::Result<()> {
         env_logger::init_from_env(
             env_logger::Env::default().filter_or(env_logger::DEFAULT_FILTER_ENV, "info"),
         );
@@ -334,6 +349,95 @@ mod tests {
         let future_b = start(swarm_b);
 
         join!(future_a, future_b);
+
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn test_store_relay() -> std::io::Result<()> {
+        env_logger::init_from_env(
+            env_logger::Env::default().filter_or(env_logger::DEFAULT_FILTER_ENV, "info"),
+        );
+
+        let key_a = Keypair::generate_ed25519();
+        let peer_id_a = PeerId::from(key_a.public());
+        let address_a = Multiaddr::from_str(&ADDR_A.to_string()).unwrap();
+
+        let key_b = Keypair::generate_ed25519();
+        let peer_id_b = PeerId::from(key_b.public());
+        let address_b = Multiaddr::from_str(&ADDR_B.to_string()).unwrap();
+
+        let key_c = Keypair::generate_ed25519();
+        let peer_id_c = PeerId::from(key_c.public());
+        let address_c = Multiaddr::from_str(&ADDR_C.to_string()).unwrap();
+
+        let transport_a = libp2p::development_transport(key_a.clone()).await?;
+        let transport_b = libp2p::development_transport(key_b.clone()).await?;
+        let transport_c = libp2p::development_transport(key_c.clone()).await?;
+
+        let mut waku_relay_behaviour_a = WakuRelayBehaviour::new();
+        let mut waku_store_behaviour_b = WakuStoreBehaviour::new(10);
+        let mut waku_store_behaviour_c = WakuStoreBehaviour::new(10);
+
+        let pubsub_topic = "test_pubsub_topic";
+
+        waku_relay_behaviour_a.subscribe(&pubsub_topic).unwrap();
+        waku_store_behaviour_b.subscribe(&pubsub_topic).unwrap();
+
+        waku_relay_behaviour_a.add_peer(&peer_id_b);
+        waku_store_behaviour_b.add_relay_peer(&peer_id_a);
+
+        let mut swarm_a = libp2p::Swarm::new(transport_a, waku_relay_behaviour_a, peer_id_a);
+        let mut swarm_b = libp2p::Swarm::new(transport_b, waku_store_behaviour_b, peer_id_b);
+        let mut swarm_c = libp2p::Swarm::new(transport_c, waku_store_behaviour_c, peer_id_c);
+
+        swarm_a.listen_on(address_a.clone()).unwrap();
+        swarm_b.listen_on(address_b.clone()).unwrap();
+        swarm_c.listen_on(address_c.clone()).unwrap();
+
+        match swarm_a.dial(address_b.clone()) {
+            Ok(_) => info!("Dialed {:?}", address_b),
+            Err(e) => info!("Dial {:?} failed: {:?}", address_b, e),
+        }
+
+        match swarm_b.dial(address_c.clone()) {
+            Ok(_) => info!("Dialed {:?}", address_c),
+            Err(e) => info!("Dial {:?} failed: {:?}", address_c, e),
+        }
+
+        let mut msg = WakuMessage::new();
+        let content_topic = "test_content_topic";
+        msg.set_payload(b"test_payload".to_vec());
+        msg.set_content_topic(content_topic.to_string());
+
+        // it takes a while until the gossipsub is setup
+        // keep trying, until the message is published
+        loop {
+            match swarm_a
+                .behaviour_mut()
+                .publish(pubsub_topic.clone(), msg.clone())
+            {
+                Ok(m) => {
+                    info!("Published message: {}", m);
+                    break;
+                }
+                Err(e) => info!("{}", e),
+            }
+        }
+
+        let cursor = compute_index(msg);
+
+        let mut content_topics = Vec::new();
+        content_topics.push(content_topic.to_string());
+        swarm_c.behaviour_mut().send_query(
+            peer_id_b,
+            "test_request_id".to_string(),
+            cursor,
+            1,
+            true,
+            pubsub_topic.to_string(),
+            content_topics,
+        );
 
         Ok(())
     }
