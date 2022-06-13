@@ -28,7 +28,7 @@ const DEFAULT_PUBSUB_TOPIC: &str = "/waku/2/default-waku/proto";
 
 #[derive(NetworkBehaviour)]
 #[behaviour(event_process = true)]
-struct WakuStoreBehaviour {
+pub struct WakuStoreBehaviour {
     #[behaviour(ignore)]
     message_queue: WakuMessageQueue,
     req_res: RequestResponse<WakuStoreCodec>,
@@ -52,10 +52,13 @@ impl NetworkBehaviourEventProcess<WakuRelayEvent> for WakuStoreBehaviour {
                 topic.clone(),
             );
             info!(
-                "WakuStore: queueing message received via WakuRelay: {:?}",
+                "WakuStore: message received via WakuRelay: {:?}",
                 indexed_message
             );
-            self.message_queue.push(indexed_message).unwrap();
+            match self.message_queue.push(indexed_message) {
+                Ok(r) => info!("WakuStore: successfully queued message"),
+                Err(e) => info!("WakuStore: not queueing message: {:?}", e),
+            };
         }
     }
 }
@@ -147,7 +150,7 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<HistoryRPC, HistoryRPC>>
 }
 
 impl WakuStoreBehaviour {
-    fn new(max_messages: usize) -> Self {
+    pub fn new(max_messages: usize) -> Self {
         Self {
             message_queue: WakuMessageQueue::new(max_messages),
             req_res: RequestResponse::new(
@@ -167,7 +170,7 @@ impl WakuStoreBehaviour {
         self.relay.add_peer(peer_id);
     }
 
-    fn subscribe(&mut self, topic: &str) -> Result<bool, SubscriptionError> {
+    pub fn subscribe(&mut self, topic: &str) -> Result<bool, SubscriptionError> {
         self.relay.subscribe(topic)
     }
 
