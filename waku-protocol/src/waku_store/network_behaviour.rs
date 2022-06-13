@@ -56,7 +56,7 @@ impl NetworkBehaviourEventProcess<WakuRelayEvent> for WakuStoreBehaviour {
                 indexed_message
             );
             match self.message_queue.push(indexed_message) {
-                Ok(r) => info!("WakuStore: successfully queued message"),
+                Ok(_) => info!("WakuStore: successfully queued message"),
                 Err(e) => info!("WakuStore: not queueing message: {:?}", e),
             };
         }
