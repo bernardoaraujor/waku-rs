@@ -3,12 +3,14 @@ use libp2p::gossipsub::IdentTopic;
 use libp2p::{
     gossipsub::{
         error::{PublishError, SubscriptionError},
-        Gossipsub, GossipsubConfigBuilder, GossipsubEvent, MessageAuthenticity, MessageId,
-        ValidationMode,
+        Gossipsub, GossipsubConfigBuilder, GossipsubEvent, GossipsubMessage, MessageAuthenticity,
+        MessageId, ValidationMode,
     },
     NetworkBehaviour, PeerId,
 };
 use protobuf::Message;
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 
 const RELAY_PROTOCOL_ID: &str = "/vac/waku/relay/2.0.0";
 
@@ -31,9 +33,16 @@ impl From<GossipsubEvent> for WakuRelayEvent {
 
 impl WakuRelayBehaviour {
     pub fn new() -> Self {
+        let message_id_fn = |message: &GossipsubMessage| {
+            let mut s = DefaultHasher::new();
+            message.data.hash(&mut s);
+            MessageId::from(s.finish().to_string())
+        };
+
         let gossipsub_config = GossipsubConfigBuilder::default()
             .protocol_id_prefix(RELAY_PROTOCOL_ID)
             .validation_mode(ValidationMode::Anonymous) // StrictNoSign
+            .message_id_fn(message_id_fn)
             .build()
             .expect("Valid config");
 
