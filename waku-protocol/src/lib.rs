@@ -1,5 +1,5 @@
 mod pb;
-mod waku_lightpush;
-mod waku_message;
-mod waku_relay;
-mod waku_store;
+pub mod waku_lightpush;
+pub mod waku_message;
+pub mod waku_relay;
+pub mod waku_store;

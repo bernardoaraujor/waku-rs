@@ -13,10 +13,14 @@ libp2p = "0.43.0"
 sha2 = "0.10.2"
 async-trait = "0.1.53"
 futures = "0.3.21"
+async-std = { version = "1.11.0", features = ["attributes"] }
 
 [build-dependencies]
 protoc-rust = "2"
 
 [dev-dependencies]
-async-std = { version = "1.11.0", features = ["attributes"] }
+
 bs58 = "0.4.0"
+
+[[bin]]
+name = "store"
