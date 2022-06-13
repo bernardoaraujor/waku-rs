@@ -36,7 +36,6 @@ impl IndexedWakuMessage {
 }
 
 pub struct WakuMessageQueue {
-    max_messages: usize,
     messages: VecDeque<IndexedWakuMessage>,
     queued_digests: HashSet<Vec<u8>>,
 }
@@ -49,7 +48,6 @@ pub enum WakuMessageQueueErrors {
 impl WakuMessageQueue {
     pub fn new(max_messages: usize) -> Self {
         WakuMessageQueue {
-            max_messages,
             messages: VecDeque::with_capacity(max_messages),
             queued_digests: HashSet::new(),
         }
