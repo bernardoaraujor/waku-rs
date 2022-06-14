@@ -12,6 +12,7 @@ use libp2p::{
     swarm::NetworkBehaviourEventProcess,
     Multiaddr, NetworkBehaviour, PeerId,
 };
+use log::info;
 use std::iter::once;
 
 #[derive(NetworkBehaviour)]
@@ -22,9 +23,7 @@ pub struct WakuLightPushBehaviour {
 }
 
 impl NetworkBehaviourEventProcess<WakuRelayEvent> for WakuLightPushBehaviour {
-    fn inject_event(&mut self, event: WakuRelayEvent) {
-        todo!()
-    }
+    fn inject_event(&mut self, _: WakuRelayEvent) {}
 }
 
 impl NetworkBehaviourEventProcess<RequestResponseEvent<PushRPC, PushRPC>>
@@ -47,6 +46,8 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<PushRPC, PushRPC>>
             let req_topic = req.get_pubsub_topic();
             let req_msg = req.get_message().clone();
             let mut res = PushResponse::new();
+
+            info!("WakuLightPush: pushing request: {:?}", req);
 
             match self.relay.publish(req_topic, req_msg) {
                 Ok(_) => {
@@ -71,9 +72,15 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<PushRPC, PushRPC>>
         } = event
         {
             if response.get_response().get_is_success() {
-                // todo: treat successful response
+                info!(
+                    "WakuLightPush: successful response: {:?}",
+                    response.get_response()
+                );
             } else {
-                // todo: treat unsuccessful response
+                info!(
+                    "WakuLightPush: unsuccessful response: {:?}",
+                    response.get_response()
+                );
             }
         }
     }
