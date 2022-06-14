@@ -1,4 +1,5 @@
 [workspace]
 members = [
     "waku-protocol",
+    "waku-node",
 ]
