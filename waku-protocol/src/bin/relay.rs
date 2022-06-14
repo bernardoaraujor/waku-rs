@@ -59,22 +59,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let mut stdin = io::BufReader::new(io::stdin()).lines().fuse();
 
     loop {
-        select! {
-            line = stdin.select_next_some() => {
-                let mut msg = WakuMessage::new();
-                let content_topic = "test_content_topic";
-                msg.set_payload(line.expect("Stdin not to close").as_bytes().to_vec());
-                msg.set_content_topic(content_topic.to_string());
-                match swarm.behaviour_mut().publish(&pubsub_topic, msg) {
-                    Ok(m) => info!("Published message: {}", m),
-                    Err(e) => info!("Error publishing message: {}", e),
-                };
-            },
-            event = swarm.select_next_some() => {
-                info!("{:?}", event);
-            }
-        }
+        let event = swarm.select_next_some().await;
+        info!("{:?}", event);
     }
-
-    Ok(())
 }
