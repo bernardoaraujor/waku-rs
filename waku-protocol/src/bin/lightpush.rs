@@ -1,0 +1,42 @@
+// this file is being used for development purposes!
+// cargo run --bin light_push
+// cargo run --bin light_push -- /ip4/127.0.0.1/tcp/xxxxx
+
+use libp2p::futures::StreamExt;
+use libp2p::{identity::Keypair, swarm::Swarm, Multiaddr, PeerId};
+use log::info;
+use std::error::Error;
+use waku_protocol::waku_lightpush::network_behaviour::WakuLightPushBehaviour;
+
+#[async_std::main]
+async fn main() -> Result<(), Box<dyn Error>> {
+    env_logger::init_from_env(
+        env_logger::Env::default().filter_or(env_logger::DEFAULT_FILTER_ENV, "info"),
+    );
+
+    let local_key = Keypair::generate_ed25519();
+    let local_peer_id = PeerId::from(local_key.public());
+    info!("Local peer id: {:?}", local_peer_id);
+
+    let transport = libp2p::development_transport(local_key.clone()).await?;
+
+    let waku_lp_behaviour = WakuLightPushBehaviour::new();
+
+    let mut swarm = Swarm::new(transport, waku_lp_behaviour, local_peer_id);
+    swarm
+        .listen_on("/ip4/0.0.0.0/tcp/0".parse().unwrap())
+        .unwrap();
+
+    if let Some(to_dial) = std::env::args().nth(1) {
+        let address: Multiaddr = to_dial.parse().expect("User to provide valid address.");
+        match swarm.dial(address.clone()) {
+            Ok(_) => info!("Dialed {:?}", address),
+            Err(e) => panic!("failed to dial address: {:?} {:?}", address, e),
+        }
+    }
+
+    loop {
+        let event = swarm.select_next_some().await;
+        info!("{:?}", event);
+    }
+}
