@@ -15,7 +15,7 @@ struct Cli {
     #[clap(long, default_value = "true")]
     relay: bool,
 
-    /// Multiaddr of peer to directly connect with. Option may be repeated.
+    /// Multiaddr of peer to directly connect with. Option may be repeated
     #[clap(long)]
     static_node: Option<Vec<Multiaddr>>,
 
@@ -30,6 +30,10 @@ struct Cli {
     /// Maximum number of messages to store
     #[clap(long, default_value = "50000")]
     store_capacity: usize,
+
+    /// Enable lightpush protocol
+    #[clap(long, default_value = "false")]
+    lightpush: bool,
 }
 
 #[async_std::main]
@@ -47,7 +51,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let transport = libp2p::development_transport(local_key.clone()).await?;
 
     let mut waku_node_behaviour =
-        WakuNodeBehaviour::new(args.relay, args.store, args.store_capacity);
+        WakuNodeBehaviour::new(args.relay, args.store, args.store_capacity, args.lightpush);
 
     match args.topics {
         Some(topics) => {

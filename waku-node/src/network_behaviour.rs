@@ -1,6 +1,7 @@
 use libp2p::swarm::behaviour::toggle::Toggle;
 use libp2p::NetworkBehaviour;
 use waku_protocol::{
+    waku_lightpush::network_behaviour::{WakuLightPushBehaviour, WakuLightPushEvent},
     waku_relay::network_behaviour::{WakuRelayBehaviour, WakuRelayEvent},
     waku_store::network_behaviour::{WakuStoreBehaviour, WakuStoreEvent},
 };
@@ -10,12 +11,14 @@ use waku_protocol::{
 pub struct WakuNodeBehaviour {
     relay: Toggle<WakuRelayBehaviour>,
     store: Toggle<WakuStoreBehaviour>,
+    lightpush: Toggle<WakuLightPushBehaviour>,
 }
 
 #[derive(Debug)]
 pub enum WakuNodeEvent {
     WakuRelayBehaviour(WakuRelayEvent),
     WakuStoreBehaviour(WakuStoreEvent),
+    WakuLightPushBehaviour(WakuLightPushEvent),
 }
 
 impl From<WakuRelayEvent> for WakuNodeEvent {
@@ -30,6 +33,12 @@ impl From<WakuStoreEvent> for WakuNodeEvent {
     }
 }
 
+impl From<WakuLightPushEvent> for WakuNodeEvent {
+    fn from(event: WakuLightPushEvent) -> Self {
+        Self::WakuLightPushBehaviour(event)
+    }
+}
+
 #[derive(Debug)]
 pub enum WakuNodeError {
     RelayNotEnabled,
@@ -37,7 +46,12 @@ pub enum WakuNodeError {
 }
 
 impl WakuNodeBehaviour {
-    pub fn new(relay_enabled: bool, store_enabled: bool, store_capacity: usize) -> Self {
+    pub fn new(
+        relay_enabled: bool,
+        store_enabled: bool,
+        store_capacity: usize,
+        lightpush_enabled: bool,
+    ) -> Self {
         let relay = match relay_enabled {
             true => Toggle::from(Some(WakuRelayBehaviour::new())),
             false => Toggle::from(None),
@@ -48,7 +62,16 @@ impl WakuNodeBehaviour {
             false => Toggle::from(None),
         };
 
-        WakuNodeBehaviour { relay, store }
+        let lightpush = match lightpush_enabled {
+            true => Toggle::from(Some(WakuLightPushBehaviour::new())),
+            false => Toggle::from(None),
+        };
+
+        WakuNodeBehaviour {
+            relay,
+            store,
+            lightpush,
+        }
     }
 
     pub fn subscribe(&mut self, topic: &str) -> Result<(), WakuNodeError> {

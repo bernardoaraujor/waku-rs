@@ -17,9 +17,28 @@ use std::iter::once;
 
 #[derive(NetworkBehaviour)]
 #[behaviour(event_process = true)]
+#[behaviour(out_event = "WakuLightPushEvent")]
 pub struct WakuLightPushBehaviour {
     relay: WakuRelayBehaviour,
     req_res: RequestResponse<WakuLightPushCodec>,
+}
+
+#[derive(Debug)]
+pub enum WakuLightPushEvent {
+    WakuRelayBehaviour(WakuRelayEvent),
+    RequestResponseBehaviour(RequestResponseEvent<PushRPC, PushRPC>),
+}
+
+impl From<WakuRelayEvent> for WakuLightPushEvent {
+    fn from(event: WakuRelayEvent) -> Self {
+        Self::WakuRelayBehaviour(event)
+    }
+}
+
+impl From<RequestResponseEvent<PushRPC, PushRPC>> for WakuLightPushEvent {
+    fn from(event: RequestResponseEvent<PushRPC, PushRPC>) -> Self {
+        Self::RequestResponseBehaviour(event)
+    }
 }
 
 impl NetworkBehaviourEventProcess<WakuRelayEvent> for WakuLightPushBehaviour {
