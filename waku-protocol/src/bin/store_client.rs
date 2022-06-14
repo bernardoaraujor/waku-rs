@@ -9,7 +9,6 @@ use libp2p::futures::StreamExt;
 use libp2p::{identity::Keypair, swarm::Swarm, Multiaddr, PeerId};
 use log::info;
 use std::error::Error;
-use std::str::FromStr;
 use waku_protocol::waku_message::WakuMessage;
 use waku_protocol::waku_store::network_behaviour::{compute_index, WakuStoreBehaviour};
 
@@ -47,7 +46,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    let mut peer_id = std::env::args().nth(3).unwrap().parse().unwrap();
+    let peer_id = std::env::args().nth(3).unwrap().parse().unwrap();
 
     let mut stdin = io::BufReader::new(io::stdin()).lines().fuse();
 
@@ -78,6 +77,4 @@ async fn main() -> Result<(), Box<dyn Error>> {
             }
         }
     }
-
-    Ok(())
 }
