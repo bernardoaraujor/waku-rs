@@ -26,11 +26,30 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(NetworkBehaviour)]
 #[behaviour(event_process = true)]
+#[behaviour(out_event = "WakuStoreEvent")]
 pub struct WakuStoreBehaviour {
     #[behaviour(ignore)]
     message_queue: WakuMessageQueue,
     req_res: RequestResponse<WakuStoreCodec>,
     relay: WakuRelayBehaviour, // todo: Either filter
+}
+
+#[derive(Debug)]
+pub enum WakuStoreEvent {
+    WakuRelayBehaviour(WakuRelayEvent),
+    RequestResponseBehaviour(RequestResponseEvent<HistoryRPC, HistoryRPC>),
+}
+
+impl From<WakuRelayEvent> for WakuStoreEvent {
+    fn from(event: WakuRelayEvent) -> Self {
+        Self::WakuRelayBehaviour(event)
+    }
+}
+
+impl From<RequestResponseEvent<HistoryRPC, HistoryRPC>> for WakuStoreEvent {
+    fn from(event: RequestResponseEvent<HistoryRPC, HistoryRPC>) -> Self {
+        Self::RequestResponseBehaviour(event)
+    }
 }
 
 impl NetworkBehaviourEventProcess<WakuRelayEvent> for WakuStoreBehaviour {

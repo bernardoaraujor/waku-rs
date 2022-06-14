@@ -22,6 +22,14 @@ struct Cli {
     /// List of topics to listen
     #[clap(long)]
     topics: Option<Vec<String>>,
+
+    /// Enable store protocol
+    #[clap(long, default_value = "false")]
+    store: bool,
+
+    /// Maximum number of messages to store
+    #[clap(long, default_value = "50000")]
+    store_capacity: usize,
 }
 
 #[async_std::main]
@@ -38,7 +46,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let transport = libp2p::development_transport(local_key.clone()).await?;
 
-    let mut waku_node_behaviour = WakuNodeBehaviour::new(args.relay);
+    let mut waku_node_behaviour =
+        WakuNodeBehaviour::new(args.relay, args.store, args.store_capacity);
 
     match args.topics {
         Some(topics) => {
