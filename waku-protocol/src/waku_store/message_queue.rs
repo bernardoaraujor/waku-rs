@@ -94,13 +94,13 @@ impl WakuMessageQueue {
         self.messages.len()
     }
 
-    pub fn front(&self) -> Option<&IndexedWakuMessage> {
-        self.messages.front()
-    }
-
-    pub fn back(&self) -> Option<&IndexedWakuMessage> {
-        self.messages.back()
-    }
+    // pub fn front(&self) -> Option<&IndexedWakuMessage> {
+    //     self.messages.front()
+    // }
+    //
+    // pub fn back(&self) -> Option<&IndexedWakuMessage> {
+    //     self.messages.back()
+    // }
 
     pub fn get(&self, i: usize) -> Option<&IndexedWakuMessage> {
         self.messages.get(i)
