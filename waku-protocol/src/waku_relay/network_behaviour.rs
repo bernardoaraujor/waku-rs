@@ -12,6 +12,7 @@ use protobuf::Message;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
+pub const DEFAULT_PUBSUB_TOPIC: &str = "/waku/2/default-waku/proto";
 const RELAY_PROTOCOL_ID: &str = "/vac/waku/relay/2.0.0";
 
 #[derive(NetworkBehaviour)]

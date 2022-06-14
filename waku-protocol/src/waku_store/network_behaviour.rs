@@ -24,8 +24,6 @@ use sha2::{Digest, Sha256};
 use std::iter::once;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-// const DEFAULT_PUBSUB_TOPIC: &str = "/waku/2/default-waku/proto";
-
 #[derive(NetworkBehaviour)]
 #[behaviour(event_process = true)]
 pub struct WakuStoreBehaviour {
