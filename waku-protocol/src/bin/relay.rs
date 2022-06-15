@@ -2,11 +2,24 @@
 // cargo run --bin relay -- x_pubsub_topic_x
 // cargo run --bin relay -- x_pubsub_topic_x /ip4/127.0.0.1/tcp/xxxxx
 
+use async_std::io;
+use async_std::io::prelude::BufReadExt;
+use async_std::io::stdin;
+use futures::select;
 use libp2p::futures::StreamExt;
-use libp2p::{identity::Keypair, swarm::Swarm, Multiaddr, PeerId};
+use libp2p::gossipsub::GossipsubEvent;
+use libp2p::{
+    gossipsub::{Gossipsub, GossipsubEvent::Subscribed},
+    identity::Keypair,
+    swarm::{Swarm, SwarmEvent},
+    Multiaddr, PeerId,
+};
 use log::info;
 use std::error::Error;
+use std::str::FromStr;
+use waku_protocol::waku_message::WakuMessage;
 use waku_protocol::waku_relay::network_behaviour::WakuRelayBehaviour;
+use waku_protocol::waku_relay::network_behaviour::WakuRelayEvent::GossipSub;
 
 #[async_std::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -42,8 +55,26 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
+    // Read full lines from stdin
+    let mut stdin = io::BufReader::new(io::stdin()).lines().fuse();
+
     loop {
-        let event = swarm.select_next_some().await;
-        info!("{:?}", event);
+        select! {
+            line = stdin.select_next_some() => {
+                let mut msg = WakuMessage::new();
+                let content_topic = "test_content_topic";
+                msg.set_payload(line.expect("Stdin not to close").as_bytes().to_vec());
+                msg.set_content_topic(content_topic.to_string());
+                match swarm.behaviour_mut().publish(&pubsub_topic, msg) {
+                    Ok(m) => info!("Published message: {}", m),
+                    Err(e) => info!("Error publishing message: {}", e),
+                };
+            },
+            event = swarm.select_next_some() => {
+                info!("{:?}", event);
+            }
+        }
     }
+
+    Ok(())
 }
