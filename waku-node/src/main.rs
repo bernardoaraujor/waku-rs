@@ -11,9 +11,9 @@ pub mod network_behaviour;
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
 struct Cli {
-    /// Enable relay protocol
+    /// Enable relay protocol [default: true]
     #[clap(long)]
-    relay: bool,
+    relay: Option<bool>,
 
     /// Multiaddr of peer to directly connect with. Option may be repeated
     #[clap(long)]
@@ -23,17 +23,17 @@ struct Cli {
     #[clap(long)]
     topics: Option<Vec<String>>,
 
-    /// Enable store protocol
+    /// Enable store protocol [default: false]
     #[clap(long)]
-    store: bool,
+    store: Option<bool>,
 
     /// Maximum number of messages to store
     #[clap(long, default_value = "50000")]
     store_capacity: usize,
 
-    /// Enable lightpush protocol
+    /// Enable lightpush protocol [default: false]
     #[clap(long)]
-    lightpush: bool,
+    lightpush: Option<bool>,
 }
 
 #[async_std::main]
@@ -50,8 +50,27 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let transport = libp2p::development_transport(local_key.clone()).await?;
 
-    let mut waku_node_behaviour =
-        WakuNodeBehaviour::new(args.relay, args.store, args.store_capacity, args.lightpush);
+    let relay_enabled = match args.relay {
+        Some(r) => r,
+        None => true,
+    };
+
+    let store_enabled = match args.store {
+        Some(s) => s,
+        None => false,
+    };
+
+    let lightpush_enabled = match args.lightpush {
+        Some(l) => l,
+        None => false,
+    };
+
+    let mut waku_node_behaviour = WakuNodeBehaviour::new(
+        relay_enabled,
+        store_enabled,
+        args.store_capacity,
+        lightpush_enabled,
+    );
 
     match args.topics {
         Some(topics) => {
