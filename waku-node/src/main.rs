@@ -12,7 +12,7 @@ pub mod network_behaviour;
 #[clap(author, version, about, long_about = None)]
 struct Cli {
     /// Enable relay protocol
-    #[clap(long, default_value = "true")]
+    #[clap(long)]
     relay: bool,
 
     /// Multiaddr of peer to directly connect with. Option may be repeated
@@ -24,7 +24,7 @@ struct Cli {
     topics: Option<Vec<String>>,
 
     /// Enable store protocol
-    #[clap(long, default_value = "false")]
+    #[clap(long)]
     store: bool,
 
     /// Maximum number of messages to store
@@ -32,7 +32,7 @@ struct Cli {
     store_capacity: usize,
 
     /// Enable lightpush protocol
-    #[clap(long, default_value = "false")]
+    #[clap(long)]
     lightpush: bool,
 }
 
