@@ -16,16 +16,9 @@
 
 use async_std::io;
 use async_std::io::prelude::BufReadExt;
-use async_std::io::stdin;
 use futures::select;
 use libp2p::futures::StreamExt;
-use libp2p::gossipsub::GossipsubEvent;
-use libp2p::{
-    gossipsub::{Gossipsub, GossipsubEvent::Subscribed},
-    identity::Keypair,
-    swarm::{Swarm, SwarmEvent},
-    Multiaddr, PeerId,
-};
+use libp2p::{identity::Keypair, swarm::Swarm, Multiaddr, PeerId};
 use log::info;
 use std::error::Error;
 use waku_protocol::waku_message::WakuMessage;
