@@ -13,7 +13,9 @@
 //! ```
 //!
 //! Every line you feed into stdin will be the unencrypted payload of a message in a query
-//! where the content topic is defined by the CONTENT_TOPIC constant.
+//! where the content topic is defined by the CONTENT_TOPIC constant,
+//! the page size is defined by the PAGE_SIZE constant,
+//! and the direction is defined by the DIRECTION constant.
 //!
 //! If no relay or lightpush has fed any messages to the Store node, all queries will be unsuccessful.
 //! You should run the relay or lightpush examples before this one.
@@ -29,6 +31,8 @@ use waku_protocol::waku_message::WakuMessage;
 use waku_protocol::waku_store::network_behaviour::{compute_index, WakuStoreBehaviour};
 
 const CONTENT_TOPIC: &str = "content_topic";
+const PAGE_SIZE: u64 = 3;
+const DIRECTION: bool = true; // true = FORWARD
 
 #[async_std::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -92,8 +96,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     peer_id,
                     "test_request_id".to_string(),
                     cursor,
-                    1,
-                    true,
+                    PAGE_SIZE,
+                    DIRECTION,
                     pubsub_topic.to_string(),
                     content_topics,
                 );
