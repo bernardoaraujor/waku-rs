@@ -1,3 +1,4 @@
+use libp2p::gossipsub::error::SubscriptionError;
 use libp2p::swarm::behaviour::toggle::Toggle;
 use libp2p::NetworkBehaviour;
 use waku_protocol::{
@@ -39,12 +40,6 @@ impl From<WakuLightPushEvent> for WakuNodeEvent {
     }
 }
 
-#[derive(Debug)]
-pub enum WakuNodeError {
-    RelayNotEnabled,
-    RelaySubscriptionErr,
-}
-
 impl WakuNodeBehaviour {
     pub fn new(
         relay_enabled: bool,
@@ -52,7 +47,8 @@ impl WakuNodeBehaviour {
         store_capacity: usize,
         lightpush_enabled: bool,
     ) -> Self {
-        let relay = match relay_enabled {
+        // Store and LightPush already have Relay
+        let relay = match relay_enabled && !store_enabled && !lightpush_enabled {
             true => Toggle::from(Some(WakuRelayBehaviour::new())),
             false => Toggle::from(None),
         };
@@ -74,13 +70,31 @@ impl WakuNodeBehaviour {
         }
     }
 
-    pub fn subscribe(&mut self, topic: &str) -> Result<(), WakuNodeError> {
+    pub fn subscribe(&mut self, topic: &str) -> Result<(), SubscriptionError> {
         match self.relay.as_mut() {
             Some(r) => match r.subscribe(topic) {
-                Ok(_) => return Ok(()),
-                Err(_) => return Err(WakuNodeError::RelaySubscriptionErr),
+                Ok(_) => {}
+                Err(e) => return Err(e),
             },
-            None => return Err(WakuNodeError::RelayNotEnabled),
+            None => {}
+        };
+
+        match self.store.as_mut() {
+            Some(s) => match s.subscribe(topic) {
+                Ok(_) => {}
+                Err(e) => return Err(e),
+            },
+            None => {}
         }
+
+        match self.lightpush.as_mut() {
+            Some(l) => match l.subscribe(topic) {
+                Ok(_) => {}
+                Err(e) => return Err(e),
+            },
+            None => {}
+        }
+
+        Ok(())
     }
 }

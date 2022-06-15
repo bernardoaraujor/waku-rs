@@ -5,6 +5,7 @@ use crate::pb::{
 use crate::waku_lightpush::codec::{WakuLightPushCodec, WakuLightPushProtocol};
 use crate::waku_relay::network_behaviour::{WakuRelayBehaviour, WakuRelayEvent};
 use libp2p::{
+    gossipsub::error::SubscriptionError,
     request_response::{
         ProtocolSupport, RequestResponse, RequestResponseConfig, RequestResponseEvent,
         RequestResponseMessage,
@@ -115,6 +116,10 @@ impl WakuLightPushBehaviour {
                 RequestResponseConfig::default(),
             ),
         }
+    }
+
+    pub fn subscribe(&mut self, topic: &str) -> Result<bool, SubscriptionError> {
+        self.relay.subscribe(topic)
     }
 
     pub fn add_lightpush_peer(&mut self, peer_id: PeerId, peer_addr: Multiaddr) {
