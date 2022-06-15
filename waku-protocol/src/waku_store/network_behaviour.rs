@@ -111,7 +111,7 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<HistoryRPC, HistoryRPC>>
 
             if !self.message_queue.has_queued_digest(query_digest) {
                 info!("WakuStore: query not found");
-                response.set_error(HistoryResponse_Error::NONE);
+                response.set_error(HistoryResponse_Error::INVALID_CURSOR);
             } else {
                 let mut res_messages = Vec::new();
                 let mut j = 0;
@@ -160,8 +160,12 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<HistoryRPC, HistoryRPC>>
             message: RequestResponseMessage::Response { response, .. },
         } = event
         {
-            info!("WakuStore: received response. {:?}", response);
-            //todo: parse response
+            match response.get_response().get_error() {
+                HistoryResponse_Error::INVALID_CURSOR => info!("WakuStore: failed query."),
+                HistoryResponse_Error::NONE => {
+                    info!("WakuStore: received response. {:?}", response)
+                }
+            }
         }
     }
 }
