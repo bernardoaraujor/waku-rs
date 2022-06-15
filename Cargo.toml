@@ -2,4 +2,5 @@
 members = [
     "waku-protocol",
     "waku-node",
+    "examples",
 ]

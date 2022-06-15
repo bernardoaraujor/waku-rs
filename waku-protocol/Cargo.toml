@@ -21,6 +21,3 @@ protoc-rust = "2"
 [dev-dependencies]
 
 bs58 = "0.4.0"
-
-[[bin]]
-name = "store"

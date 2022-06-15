@@ -1,0 +1,12 @@
+[package]
+name = "waku-rs-examples"
+edition = "2021"
+version = "0.1.0"
+
+[dependencies]
+env_logger = "0.9.0"
+log = "0.4.16"
+libp2p = "0.43.0"
+async-std = { version = "1.11.0", features = ["attributes"] }
+futures = "0.3.21"
+waku-protocol = { path = "../waku-protocol" }
