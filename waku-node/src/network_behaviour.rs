@@ -48,7 +48,7 @@ impl WakuNodeBehaviour {
         lightpush_enabled: bool,
     ) -> Self {
         // Store and LightPush already have Relay
-        let relay = match relay_enabled && !store_enabled && !lightpush_enabled {
+        let relay = match relay_enabled && !(store_enabled || lightpush_enabled) {
             true => Toggle::from(Some(WakuRelayBehaviour::new())),
             false => Toggle::from(None),
         };
