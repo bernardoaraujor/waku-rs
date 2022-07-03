@@ -9,7 +9,7 @@ edition = "2021"
 env_logger = "0.9.0"
 log = "0.4.16"
 protobuf = "2"
-libp2p = "0.43.0"
+libp2p = { git = "https://github.com/libp2p/rust-libp2p", rev = "6db57121e9f377779c4758af37ef0075f06d9f70" }
 sha2 = "0.10.2"
 async-trait = "0.1.53"
 futures = "0.3.21"

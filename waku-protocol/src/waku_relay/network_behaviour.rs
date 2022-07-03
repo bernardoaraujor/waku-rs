@@ -3,8 +3,8 @@ use libp2p::gossipsub::IdentTopic;
 use libp2p::{
     gossipsub::{
         error::{PublishError, SubscriptionError},
-        Gossipsub, GossipsubConfigBuilder, GossipsubEvent, GossipsubMessage, MessageAuthenticity,
-        MessageId, ValidationMode,
+        Gossipsub, GossipsubConfigBuilder, GossipsubEvent, GossipsubMessage, GossipsubVersion,
+        MessageAuthenticity, MessageId, ValidationMode,
     },
     NetworkBehaviour, PeerId,
 };
@@ -41,7 +41,7 @@ impl WakuRelayBehaviour {
         };
 
         let gossipsub_config = GossipsubConfigBuilder::default()
-            .protocol_id_prefix(RELAY_PROTOCOL_ID)
+            .protocol_id(RELAY_PROTOCOL_ID, GossipsubVersion::V1_1)
             .validation_mode(ValidationMode::Anonymous) // StrictNoSign
             .message_id_fn(message_id_fn)
             .build()
