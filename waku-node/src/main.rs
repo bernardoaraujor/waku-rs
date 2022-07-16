@@ -1,19 +1,19 @@
 use crate::network_behaviour::WakuNodeEvent;
 use clap::Parser;
-use libp2p::futures::StreamExt;
-use libp2p::gossipsub::GossipsubEvent;
-use libp2p::swarm::SwarmEvent;
-use libp2p::{identity::Keypair, swarm::Swarm, Multiaddr, PeerId};
+use libp2p::{
+    futures::StreamExt, gossipsub::GossipsubEvent, identity::Keypair, swarm::Swarm,
+    swarm::SwarmEvent, Multiaddr, PeerId,
+};
 use log::info;
 use network_behaviour::WakuNodeBehaviour;
 use protobuf::Message;
 use std::error::Error;
 use tokio::sync::mpsc;
-use waku_protocol::waku_lightpush::network_behaviour::WakuLightPushEvent;
-use waku_protocol::waku_store::network_behaviour::WakuStoreEvent;
 use waku_protocol::{
+    waku_lightpush::network_behaviour::WakuLightPushEvent,
     waku_message::WakuMessage,
     waku_relay::network_behaviour::{WakuRelayEvent, DEFAULT_PUBSUB_TOPIC},
+    waku_store::network_behaviour::WakuStoreEvent,
 };
 
 mod network_behaviour;

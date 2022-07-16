@@ -1,16 +1,17 @@
 use crate::pb::waku_message_pb::WakuMessage;
-use libp2p::gossipsub::IdentTopic;
 use libp2p::{
     gossipsub::{
         error::{PublishError, SubscriptionError},
         Gossipsub, GossipsubConfigBuilder, GossipsubEvent, GossipsubMessage, GossipsubVersion,
-        MessageAuthenticity, MessageId, ValidationMode,
+        IdentTopic, MessageAuthenticity, MessageId, ValidationMode,
     },
     NetworkBehaviour, PeerId,
 };
 use protobuf::Message;
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
+use std::{
+    collections::hash_map::DefaultHasher,
+    hash::{Hash, Hasher},
+};
 
 pub const DEFAULT_PUBSUB_TOPIC: &str = "/waku/2/default-waku/proto";
 const RELAY_PROTOCOL_ID: &str = "/vac/waku/relay/2.0.0";

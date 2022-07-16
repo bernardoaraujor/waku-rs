@@ -1,9 +1,11 @@
-use crate::pb::{
-    waku_lightpush_pb::{PushRPC, PushRequest, PushResponse},
-    waku_message_pb::WakuMessage,
+use crate::{
+    pb::{
+        waku_lightpush_pb::{PushRPC, PushRequest, PushResponse},
+        waku_message_pb::WakuMessage,
+    },
+    waku_lightpush::codec::{WakuLightPushCodec, WakuLightPushProtocol},
+    waku_relay::network_behaviour::{WakuRelayBehaviour, WakuRelayEvent},
 };
-use crate::waku_lightpush::codec::{WakuLightPushCodec, WakuLightPushProtocol};
-use crate::waku_relay::network_behaviour::{WakuRelayBehaviour, WakuRelayEvent};
 use libp2p::{
     gossipsub::{error::SubscriptionError, GossipsubEvent},
     request_response::{
@@ -16,8 +18,10 @@ use libp2p::{
     Multiaddr, NetworkBehaviour, PeerId,
 };
 use log::info;
-use std::iter::once;
-use std::task::{Context, Poll};
+use std::{
+    iter::once,
+    task::{Context, Poll},
+};
 
 #[derive(NetworkBehaviour)]
 #[behaviour(

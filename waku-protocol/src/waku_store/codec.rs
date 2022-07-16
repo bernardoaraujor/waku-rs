@@ -1,9 +1,10 @@
-use crate::pb::waku_store_pb::HistoryRPC;
-use crate::waku_message::MAX_MESSAGE_SIZE;
+use crate::{pb::waku_store_pb::HistoryRPC, waku_message::MAX_MESSAGE_SIZE};
 use async_trait::async_trait;
 use futures::prelude::*;
-use libp2p::core::upgrade::{read_length_prefixed, write_length_prefixed, ProtocolName};
-use libp2p::request_response::RequestResponseCodec;
+use libp2p::{
+    core::upgrade::{read_length_prefixed, write_length_prefixed, ProtocolName},
+    request_response::RequestResponseCodec,
+};
 use protobuf::Message;
 use std::io;
 

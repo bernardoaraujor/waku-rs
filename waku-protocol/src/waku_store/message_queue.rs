@@ -1,5 +1,4 @@
-use crate::pb::waku_message_pb::WakuMessage;
-use crate::pb::waku_store_pb::Index;
+use crate::pb::{waku_message_pb::WakuMessage, waku_store_pb::Index};
 use std::collections::{vec_deque::Iter, HashSet, VecDeque};
 
 #[derive(Clone, Debug, PartialEq)]

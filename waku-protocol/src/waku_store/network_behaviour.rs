@@ -1,13 +1,16 @@
-use crate::pb::waku_message_pb::WakuMessage;
-use crate::pb::waku_store_pb::{
-    ContentFilter, HistoryQuery, HistoryRPC, HistoryResponse, HistoryResponse_Error, Index,
-    PagingInfo, PagingInfo_Direction,
-};
-use crate::waku_relay::network_behaviour::{WakuRelayBehaviour, WakuRelayEvent};
-use crate::waku_store::message_queue::IndexedWakuMessage;
-use crate::waku_store::{
-    codec::{WakuStoreCodec, WakuStoreProtocol},
-    message_queue::WakuMessageQueue,
+use crate::{
+    pb::{
+        waku_message_pb::WakuMessage,
+        waku_store_pb::{
+            ContentFilter, HistoryQuery, HistoryRPC, HistoryResponse, HistoryResponse_Error, Index,
+            PagingInfo, PagingInfo_Direction,
+        },
+    },
+    waku_relay::network_behaviour::{WakuRelayBehaviour, WakuRelayEvent},
+    waku_store::{
+        codec::{WakuStoreCodec, WakuStoreProtocol},
+        message_queue::{IndexedWakuMessage, WakuMessageQueue},
+    },
 };
 use libp2p::{
     gossipsub::{error::SubscriptionError, GossipsubEvent},
@@ -23,9 +26,11 @@ use libp2p::{
 use log::info;
 use protobuf::{Message, RepeatedField};
 use sha2::{Digest, Sha256};
-use std::iter::once;
-use std::task::{Context, Poll};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::{
+    iter::once,
+    task::{Context, Poll},
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 #[derive(NetworkBehaviour)]
 #[behaviour(

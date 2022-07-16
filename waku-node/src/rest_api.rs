@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::str;
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, str, sync::Arc};
 use tokio::sync::{mpsc::Receiver, Mutex};
 use waku_protocol::waku_message::WakuMessage;
 use warp::{http::StatusCode, reply, Filter, Rejection, Reply};
