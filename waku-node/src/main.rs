@@ -1,12 +1,23 @@
+use crate::network_behaviour::WakuNodeEvent;
 use clap::Parser;
 use libp2p::futures::StreamExt;
+use libp2p::gossipsub::GossipsubEvent;
+use libp2p::swarm::SwarmEvent;
 use libp2p::{identity::Keypair, swarm::Swarm, Multiaddr, PeerId};
 use log::info;
 use network_behaviour::WakuNodeBehaviour;
+use protobuf::Message;
 use std::error::Error;
-use waku_protocol::waku_relay::network_behaviour::DEFAULT_PUBSUB_TOPIC;
+use tokio::sync::mpsc;
+use waku_protocol::waku_lightpush::network_behaviour::WakuLightPushEvent;
+use waku_protocol::waku_store::network_behaviour::WakuStoreEvent;
+use waku_protocol::{
+    waku_message::WakuMessage,
+    waku_relay::network_behaviour::{WakuRelayEvent, DEFAULT_PUBSUB_TOPIC},
+};
 
-pub mod network_behaviour;
+mod network_behaviour;
+mod rest_api;
 
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
@@ -36,7 +47,7 @@ struct Cli {
     lightpush: bool,
 }
 
-#[async_std::main]
+#[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     env_logger::init_from_env(
         env_logger::Env::default().filter_or(env_logger::DEFAULT_FILTER_ENV, "info"),
@@ -51,7 +62,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let transport = libp2p::development_transport(local_key.clone()).await?;
 
     if args.store && args.lightpush {
-        panic!("This implementation cannot run Store and LightPush at the same time!");
+        panic!(
+            "This implementation cannot run Store and LightPush at the same time! \
+            Please check https://github.com/bernardoaraujor/waku-rs/issues/1 "
+        );
     }
 
     let mut waku_node_behaviour =
@@ -83,9 +97,44 @@ async fn main() -> Result<(), Box<dyn Error>> {
         None => {}
     }
 
+    let (relay_cache_tx, relay_cache_rx) = mpsc::channel(32);
+    tokio::spawn(rest_api::serve(relay_cache_rx));
+
     loop {
         let event = swarm.select_next_some().await;
         info!("{:?}", event);
+        match event {
+            SwarmEvent::Behaviour(WakuNodeEvent::WakuRelayBehaviour(
+                WakuRelayEvent::GossipSub(GossipsubEvent::Message {
+                    propagation_source: _,
+                    message_id: _,
+                    message,
+                }),
+            ))
+            | SwarmEvent::Behaviour(WakuNodeEvent::WakuStoreBehaviour(
+                WakuStoreEvent::WakuRelayBehaviour(WakuRelayEvent::GossipSub(
+                    GossipsubEvent::Message {
+                        propagation_source: _,
+                        message_id: _,
+                        message,
+                    },
+                )),
+            ))
+            | SwarmEvent::Behaviour(WakuNodeEvent::WakuLightPushBehaviour(
+                WakuLightPushEvent::WakuRelayBehaviour(WakuRelayEvent::GossipSub(
+                    GossipsubEvent::Message {
+                        propagation_source: _,
+                        message_id: _,
+                        message,
+                    },
+                )),
+            )) => {
+                let mut waku_message = WakuMessage::new();
+                waku_message.merge_from_bytes(&message.data).unwrap();
+                relay_cache_tx.send(waku_message).await.unwrap();
+            }
+            _ => {}
+        }
     }
 
     // Ok(())

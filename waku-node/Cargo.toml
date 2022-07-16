@@ -8,8 +8,13 @@ default-run = "waku-node"
 
 [dependencies]
 env_logger = "0.9.0"
+serde = "1.0.138"
+serde_json = "1.0.82"
 log = "0.4.16"
-async-std = { version = "1.11.0", features = ["attributes"] }
 clap = { version = "3.2.3", features = ["derive"] }
 libp2p = { git = "https://github.com/libp2p/rust-libp2p", rev = "6db57121e9f377779c4758af37ef0075f06d9f70" }
+warp = "0.3.2"
+futures = "0.3.21"
+protobuf = "2"
+tokio = { version = "1.19.2", features = ["rt", "rt-multi-thread", "macros"] }
 waku-protocol = { path = "../waku-protocol" }

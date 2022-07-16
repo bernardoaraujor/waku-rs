@@ -15,23 +15,31 @@ use libp2p::{
         ProtocolSupport, RequestResponse, RequestResponseConfig, RequestResponseEvent,
         RequestResponseMessage,
     },
-    swarm::NetworkBehaviourEventProcess,
+    swarm::{
+        NetworkBehaviour, NetworkBehaviourAction, NetworkBehaviourEventProcess, PollParameters,
+    },
     Multiaddr, NetworkBehaviour, PeerId,
 };
 use log::info;
 use protobuf::{Message, RepeatedField};
 use sha2::{Digest, Sha256};
 use std::iter::once;
+use std::task::{Context, Poll};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(NetworkBehaviour)]
-#[behaviour(event_process = true)]
-#[behaviour(out_event = "WakuStoreEvent")]
+#[behaviour(
+    event_process = true,
+    out_event = "WakuStoreEvent",
+    poll_method = "poll"
+)]
 pub struct WakuStoreBehaviour {
-    #[behaviour(ignore)]
-    message_queue: WakuMessageQueue,
     req_res: RequestResponse<WakuStoreCodec>,
     relay: WakuRelayBehaviour, // todo: Either filter
+    #[behaviour(ignore)]
+    message_queue: WakuMessageQueue,
+    #[behaviour(ignore)]
+    events: Vec<WakuStoreEvent>,
 }
 
 #[derive(Debug)]
@@ -55,8 +63,8 @@ impl From<RequestResponseEvent<HistoryRPC, HistoryRPC>> for WakuStoreEvent {
 impl NetworkBehaviourEventProcess<WakuRelayEvent> for WakuStoreBehaviour {
     fn inject_event(&mut self, event: WakuRelayEvent) {
         if let WakuRelayEvent::GossipSub(GossipsubEvent::Message {
-            propagation_source: _,
-            message_id: _,
+            propagation_source,
+            message_id,
             message,
         }) = event
         {
@@ -76,6 +84,13 @@ impl NetworkBehaviourEventProcess<WakuRelayEvent> for WakuStoreBehaviour {
                 Ok(_) => info!("WakuStore: successfully queued message"),
                 Err(e) => info!("WakuStore: not queueing message: {:?}", e),
             };
+            self.events.push(WakuStoreEvent::WakuRelayBehaviour(
+                WakuRelayEvent::GossipSub(GossipsubEvent::Message {
+                    propagation_source,
+                    message_id,
+                    message,
+                }),
+            ));
         }
     }
 }
@@ -174,6 +189,7 @@ impl WakuStoreBehaviour {
     pub fn new(max_messages: usize) -> Self {
         Self {
             message_queue: WakuMessageQueue::new(max_messages),
+            events: Vec::new(),
             req_res: RequestResponse::new(
                 WakuStoreCodec,
                 once((WakuStoreProtocol(), ProtocolSupport::Full)),
@@ -231,6 +247,22 @@ impl WakuStoreBehaviour {
         query_rpc.set_query(query);
 
         self.req_res.send_request(&peer_id, query_rpc);
+    }
+
+    fn poll(
+        &mut self,
+        _: &mut Context,
+        _: &mut impl PollParameters,
+    ) -> Poll<
+        NetworkBehaviourAction<
+            <Self as NetworkBehaviour>::OutEvent,
+            <Self as NetworkBehaviour>::ConnectionHandler,
+        >,
+    > {
+        if !self.events.is_empty() {
+            return Poll::Ready(NetworkBehaviourAction::GenerateEvent(self.events.remove(0)));
+        }
+        Poll::Pending
     }
 }
 

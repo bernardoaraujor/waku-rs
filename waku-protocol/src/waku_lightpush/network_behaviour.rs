@@ -5,23 +5,31 @@ use crate::pb::{
 use crate::waku_lightpush::codec::{WakuLightPushCodec, WakuLightPushProtocol};
 use crate::waku_relay::network_behaviour::{WakuRelayBehaviour, WakuRelayEvent};
 use libp2p::{
-    gossipsub::error::SubscriptionError,
+    gossipsub::{error::SubscriptionError, GossipsubEvent},
     request_response::{
         ProtocolSupport, RequestResponse, RequestResponseConfig, RequestResponseEvent,
         RequestResponseMessage,
     },
-    swarm::NetworkBehaviourEventProcess,
+    swarm::{
+        NetworkBehaviour, NetworkBehaviourAction, NetworkBehaviourEventProcess, PollParameters,
+    },
     Multiaddr, NetworkBehaviour, PeerId,
 };
 use log::info;
 use std::iter::once;
+use std::task::{Context, Poll};
 
 #[derive(NetworkBehaviour)]
-#[behaviour(event_process = true)]
-#[behaviour(out_event = "WakuLightPushEvent")]
+#[behaviour(
+    event_process = true,
+    out_event = "WakuLightPushEvent",
+    poll_method = "poll"
+)]
 pub struct WakuLightPushBehaviour {
     relay: WakuRelayBehaviour,
     req_res: RequestResponse<WakuLightPushCodec>,
+    #[behaviour(ignore)]
+    events: Vec<WakuLightPushEvent>,
 }
 
 #[derive(Debug)]
@@ -43,7 +51,22 @@ impl From<RequestResponseEvent<PushRPC, PushRPC>> for WakuLightPushEvent {
 }
 
 impl NetworkBehaviourEventProcess<WakuRelayEvent> for WakuLightPushBehaviour {
-    fn inject_event(&mut self, _: WakuRelayEvent) {}
+    fn inject_event(&mut self, event: WakuRelayEvent) {
+        if let WakuRelayEvent::GossipSub(GossipsubEvent::Message {
+            propagation_source,
+            message_id,
+            message,
+        }) = event
+        {
+            self.events.push(WakuLightPushEvent::WakuRelayBehaviour(
+                WakuRelayEvent::GossipSub(GossipsubEvent::Message {
+                    propagation_source,
+                    message_id,
+                    message,
+                }),
+            ));
+        }
+    }
 }
 
 impl NetworkBehaviourEventProcess<RequestResponseEvent<PushRPC, PushRPC>>
@@ -115,6 +138,7 @@ impl WakuLightPushBehaviour {
                 once((WakuLightPushProtocol(), ProtocolSupport::Full)),
                 RequestResponseConfig::default(),
             ),
+            events: Vec::new(),
         }
     }
 
@@ -141,5 +165,21 @@ impl WakuLightPushBehaviour {
         req_rpc.set_request_id(request_id);
         req_rpc.set_query(req);
         self.req_res.send_request(&peer_id, req_rpc);
+    }
+
+    fn poll(
+        &mut self,
+        _: &mut Context,
+        _: &mut impl PollParameters,
+    ) -> Poll<
+        NetworkBehaviourAction<
+            <Self as NetworkBehaviour>::OutEvent,
+            <Self as NetworkBehaviour>::ConnectionHandler,
+        >,
+    > {
+        if !self.events.is_empty() {
+            return Poll::Ready(NetworkBehaviourAction::GenerateEvent(self.events.remove(0)));
+        }
+        Poll::Pending
     }
 }
