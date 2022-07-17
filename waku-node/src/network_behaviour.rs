@@ -126,4 +126,32 @@ impl WakuNodeBehaviour {
 
         Ok(())
     }
+
+    pub fn unsubscribe(&mut self, topic: &str) -> Result<(), PublishError> {
+        match self.relay.as_mut() {
+            Some(r) => match r.unsubscribe(topic) {
+                Ok(_) => {}
+                Err(e) => return Err(e),
+            },
+            None => {}
+        };
+
+        match self.store.as_mut() {
+            Some(s) => match s.unsubscribe(topic) {
+                Ok(_) => {}
+                Err(e) => return Err(e),
+            },
+            None => {}
+        }
+
+        match self.lightpush.as_mut() {
+            Some(l) => match l.unsubscribe(topic) {
+                Ok(_) => {}
+                Err(e) => return Err(e),
+            },
+            None => {}
+        }
+
+        Ok(())
+    }
 }

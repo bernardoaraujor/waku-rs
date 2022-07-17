@@ -59,6 +59,11 @@ impl WakuRelayBehaviour {
         self.gossipsub.subscribe(&ident_topic)
     }
 
+    pub fn unsubscribe(&mut self, topic: &str) -> Result<bool, PublishError> {
+        let ident_topic = IdentTopic::new(topic);
+        self.gossipsub.unsubscribe(&ident_topic)
+    }
+
     pub fn publish(&mut self, topic: &str, msg: WakuMessage) -> Result<MessageId, PublishError> {
         let ident_topic = IdentTopic::new(topic);
         let msg_bytes = match msg.write_to_bytes() {

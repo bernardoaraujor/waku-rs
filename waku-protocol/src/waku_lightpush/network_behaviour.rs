@@ -157,6 +157,10 @@ impl WakuLightPushBehaviour {
         self.relay.subscribe(topic)
     }
 
+    pub fn unsubscribe(&mut self, topic: &str) -> Result<bool, PublishError> {
+        self.relay.unsubscribe(topic)
+    }
+
     pub fn add_lightpush_peer(&mut self, peer_id: PeerId, peer_addr: Multiaddr) {
         self.req_res.add_address(&peer_id, peer_addr);
     }

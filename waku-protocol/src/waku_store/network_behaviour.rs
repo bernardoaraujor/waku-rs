@@ -223,6 +223,10 @@ impl WakuStoreBehaviour {
         self.relay.subscribe(topic)
     }
 
+    pub fn unsubscribe(&mut self, topic: &str) -> Result<bool, PublishError> {
+        self.relay.unsubscribe(topic)
+    }
+
     pub fn send_query(
         &mut self,
         peer_id: PeerId,

@@ -27,7 +27,8 @@ struct PubSubTopicsSerDe {
 pub async fn serve(
     mut relay_cache_rx: Receiver<(WakuMessage, String)>,
     relay_publish_tx: Sender<(WakuMessage, String)>,
-    relay_subscriptions_tx: Sender<Vec<String>>,
+    relay_subscribe_tx: Sender<Vec<String>>,
+    relay_unsubscribe_tx: Sender<Vec<String>>,
 ) {
     let relay_cache: RelayCache = Arc::new(Mutex::new(HashMap::new()));
     let relay_cache_ref = relay_cache.clone();
@@ -54,12 +55,21 @@ pub async fn serve(
         .and(warp::path("v1"))
         .and(warp::path("subscriptions"))
         .and(warp::body::content_length_limit(1024 * 16).and(warp::body::json()))
-        .and(warp::any().map(move || relay_subscriptions_tx.clone()))
+        .and(warp::any().map(move || relay_subscribe_tx.clone()))
         .and_then(post_relay_v1_subscriptions);
+
+    let delete_relay_v1_subscriptions = warp::delete()
+        .and(warp::path("relay"))
+        .and(warp::path("v1"))
+        .and(warp::path("subscriptions"))
+        .and(warp::body::content_length_limit(1024 * 16).and(warp::body::json()))
+        .and(warp::any().map(move || relay_unsubscribe_tx.clone()))
+        .and_then(delete_relay_v1_subscriptions);
 
     let routes = get_relay_v1_messages_topic_route
         .or(post_relay_v1_messages_topic_route)
-        .or(post_relay_v1_subscriptions);
+        .or(post_relay_v1_subscriptions)
+        .or(delete_relay_v1_subscriptions);
     tokio::spawn(warp::serve(routes).run(([127, 0, 0, 1], 5000)));
 
     while let Some((waku_message, topic)) = relay_cache_rx.recv().await {
@@ -106,6 +116,16 @@ async fn post_relay_v1_messages_topic(
 }
 
 async fn post_relay_v1_subscriptions(
+    topics: PubSubTopicsSerDe,
+    relay_subscribe_tx: Sender<Vec<String>>,
+) -> Result<impl Reply> {
+    match relay_subscribe_tx.send(topics.topics).await {
+        Ok(_) => Ok(reply::with_status("", StatusCode::OK)),
+        Err(_) => Ok(reply::with_status("", StatusCode::INTERNAL_SERVER_ERROR)),
+    }
+}
+
+async fn delete_relay_v1_subscriptions(
     topics: PubSubTopicsSerDe,
     relay_subscribe_tx: Sender<Vec<String>>,
 ) -> Result<impl Reply> {
