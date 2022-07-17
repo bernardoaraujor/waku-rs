@@ -98,8 +98,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
     }
 
     let (relay_cache_tx, relay_cache_rx) = mpsc::channel(32);
-    let (relay_post_tx, mut relay_post_rx) = mpsc::channel(32);
-    tokio::spawn(rest_api::serve(relay_cache_rx, relay_post_tx));
+    let (relay_publish_tx, mut relay_publish_rx) = mpsc::channel(32);
+    let (relay_subscriptions_tx, mut relay_subscriptions_rx) = mpsc::channel(32);
+    tokio::spawn(rest_api::serve(
+        relay_cache_rx,
+        relay_publish_tx,
+        relay_subscriptions_tx,
+    ));
 
     loop {
         tokio::select! {
@@ -139,13 +144,23 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     _ => {}
                 }
             },
-            relay_post = relay_post_rx.recv() => {
+            relay_post = relay_publish_rx.recv() => {
                 if let Some((waku_message, topic)) = relay_post {
                     match swarm.behaviour_mut().publish(&topic, waku_message.clone()) {
                         Ok(_) => info!("Published message to Relay via REST API"),
                         Err(e) => info!("Error publishing message to Relay via REST API: {}", e),
                     };
                     relay_cache_tx.send((waku_message, topic)).await.unwrap()
+                }
+            },
+            subscribe = relay_subscriptions_rx.recv() => {
+                if let Some(topics) = subscribe {
+                    for t in topics {
+                        match swarm.behaviour_mut().subscribe(&t) {
+                            Ok(_) => info!("Relay subscribed to PubSub Topic \"{}\" via REST API", t),
+                            Err(e) => info!("Error subscribing Relay to PubSub Topic \"{}\" via REST API: {}", t, e),
+                        }
+                    }
                 }
             }
         }
