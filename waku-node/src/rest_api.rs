@@ -43,7 +43,6 @@ pub async fn serve(mut relay_cache_rx: Receiver<WakuMessage>) {
                 version: waku_message.get_version(),
                 timestamp: waku_message.get_timestamp(),
             });
-        println!("aedae {:?}", waku_message);
     }
 }
 
