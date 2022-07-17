@@ -1,8 +1,9 @@
-use libp2p::gossipsub::error::SubscriptionError;
+use libp2p::gossipsub::error::{PublishError, SubscriptionError};
 use libp2p::swarm::behaviour::toggle::Toggle;
 use libp2p::NetworkBehaviour;
 use waku_protocol::{
     waku_lightpush::network_behaviour::{WakuLightPushBehaviour, WakuLightPushEvent},
+    waku_message::WakuMessage,
     waku_relay::network_behaviour::{WakuRelayBehaviour, WakuRelayEvent},
     waku_store::network_behaviour::{WakuStoreBehaviour, WakuStoreEvent},
 };
@@ -68,6 +69,34 @@ impl WakuNodeBehaviour {
             store,
             lightpush,
         }
+    }
+
+    pub fn publish(&mut self, topic: &str, msg: WakuMessage) -> Result<(), PublishError> {
+        match self.relay.as_mut() {
+            Some(r) => match r.publish(topic, msg.clone()) {
+                Ok(_) => {}
+                Err(e) => return Err(e),
+            },
+            None => {}
+        }
+
+        match self.lightpush.as_mut() {
+            Some(l) => match l.publish(topic, msg.clone()) {
+                Ok(_) => {}
+                Err(e) => return Err(e),
+            },
+            None => {}
+        }
+
+        match self.store.as_mut() {
+            Some(s) => match s.publish(topic, msg) {
+                Ok(_) => {}
+                Err(e) => return Err(e),
+            },
+            None => {}
+        }
+
+        Ok(())
     }
 
     pub fn subscribe(&mut self, topic: &str) -> Result<(), SubscriptionError> {

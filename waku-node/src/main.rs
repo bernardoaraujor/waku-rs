@@ -98,45 +98,57 @@ async fn main() -> Result<(), Box<dyn Error>> {
     }
 
     let (relay_cache_tx, relay_cache_rx) = mpsc::channel(32);
-    tokio::spawn(rest_api::serve(relay_cache_rx));
+    let (relay_post_tx, mut relay_post_rx) = mpsc::channel(32);
+    tokio::spawn(rest_api::serve(relay_cache_rx, relay_post_tx));
 
     loop {
-        let event = swarm.select_next_some().await;
-        info!("{:?}", event);
-        match event {
-            SwarmEvent::Behaviour(WakuNodeEvent::WakuRelayBehaviour(
-                WakuRelayEvent::GossipSub(GossipsubEvent::Message {
-                    propagation_source: _,
-                    message_id: _,
-                    message,
-                }),
-            ))
-            | SwarmEvent::Behaviour(WakuNodeEvent::WakuStoreBehaviour(
-                WakuStoreEvent::WakuRelayBehaviour(WakuRelayEvent::GossipSub(
-                    GossipsubEvent::Message {
-                        propagation_source: _,
-                        message_id: _,
-                        message,
-                    },
-                )),
-            ))
-            | SwarmEvent::Behaviour(WakuNodeEvent::WakuLightPushBehaviour(
-                WakuLightPushEvent::WakuRelayBehaviour(WakuRelayEvent::GossipSub(
-                    GossipsubEvent::Message {
-                        propagation_source: _,
-                        message_id: _,
-                        message,
-                    },
-                )),
-            )) => {
-                let topic = message.topic.into_string();
-                let mut waku_message = WakuMessage::new();
-                waku_message.merge_from_bytes(&message.data).unwrap();
-                relay_cache_tx.send((waku_message, topic)).await.unwrap();
+        tokio::select! {
+            event = swarm.select_next_some() => {
+                info!("{:?}", event);
+                match event {
+                    SwarmEvent::Behaviour(WakuNodeEvent::WakuRelayBehaviour(
+                        WakuRelayEvent::GossipSub(GossipsubEvent::Message {
+                            propagation_source: _,
+                            message_id: _,
+                            message,
+                        }),
+                    ))
+                    | SwarmEvent::Behaviour(WakuNodeEvent::WakuStoreBehaviour(
+                        WakuStoreEvent::WakuRelayBehaviour(WakuRelayEvent::GossipSub(
+                            GossipsubEvent::Message {
+                                propagation_source: _,
+                                message_id: _,
+                                message,
+                            },
+                        )),
+                    ))
+                    | SwarmEvent::Behaviour(WakuNodeEvent::WakuLightPushBehaviour(
+                        WakuLightPushEvent::WakuRelayBehaviour(WakuRelayEvent::GossipSub(
+                            GossipsubEvent::Message {
+                                propagation_source: _,
+                                message_id: _,
+                                message,
+                            },
+                        )),
+                    )) => {
+                        let topic = message.topic.into_string();
+                        let mut waku_message = WakuMessage::new();
+                        waku_message.merge_from_bytes(&message.data).unwrap();
+                        relay_cache_tx.send((waku_message, topic)).await.unwrap();
+                    }
+                    _ => {}
+                }
+            },
+            relay_post = relay_post_rx.recv() => {
+                if let Some((waku_message, topic)) = relay_post {
+                    match swarm.behaviour_mut().publish(&topic, waku_message.clone()) {
+                        Ok(_) => info!("Published message to Relay via REST API"),
+                        Err(e) => info!("Error publishing message to Relay via REST API: {}", e),
+                    };
+                    relay_cache_tx.send((waku_message, topic)).await.unwrap()
+                }
             }
-            _ => {}
         }
     }
-
     // Ok(())
 }

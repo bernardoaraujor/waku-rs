@@ -13,7 +13,10 @@ use crate::{
     },
 };
 use libp2p::{
-    gossipsub::{error::SubscriptionError, GossipsubEvent},
+    gossipsub::{
+        error::{PublishError, SubscriptionError},
+        GossipsubEvent, MessageId,
+    },
     request_response::{
         ProtocolSupport, RequestResponse, RequestResponseConfig, RequestResponseEvent,
         RequestResponseMessage,
@@ -210,6 +213,10 @@ impl WakuStoreBehaviour {
 
     pub fn add_relay_peer(&mut self, peer_id: &PeerId) {
         self.relay.add_peer(peer_id);
+    }
+
+    pub fn publish(&mut self, topic: &str, msg: WakuMessage) -> Result<MessageId, PublishError> {
+        self.relay.publish(topic, msg)
     }
 
     pub fn subscribe(&mut self, topic: &str) -> Result<bool, SubscriptionError> {
