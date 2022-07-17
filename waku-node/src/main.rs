@@ -129,9 +129,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     },
                 )),
             )) => {
+                let topic = message.topic.into_string();
                 let mut waku_message = WakuMessage::new();
                 waku_message.merge_from_bytes(&message.data).unwrap();
-                relay_cache_tx.send(waku_message).await.unwrap();
+                relay_cache_tx.send((waku_message, topic)).await.unwrap();
             }
             _ => {}
         }
